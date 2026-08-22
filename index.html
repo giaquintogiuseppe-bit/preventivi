@@ -314,7 +314,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
 
       <div class="tot-box">
         <div class="grid2" style="margin-bottom:8px">
-          <div><label>Regime IVA</label><select id="p-iva-tipo" onchange="calcola()"><option value="normale">IVA 22% normale</option><option value="split">Split payment (art. 17-ter, enti pubblici)</option><option value="esente">Esente / N.I.</option></select></div>
+          <div><label>Regime IVA</label><select id="p-iva-tipo" onchange="calcola()"><option value="normale">IVA 22% normale</option><option value="split">Split payment (art. 17-ter, enti pubblici)</option><option value="esente">Esente / N.I.</option><option value="art7quater">Non soggetta – art. 7-quater DPR 633/72 (IVA 0)</option></select></div>
           <div><label>Aliquota %</label><input type="number" id="p-iva-perc" value="22" oninput="calcola()"></div>
         </div>
         <div class="tot-row"><span>Imponibile</span><span class="mn" id="t-imponibile">€ 0,00</span></div>
@@ -1071,7 +1071,7 @@ function calcola(){
   else{imp=parseFloat(document.getElementById('p-corpo-imp').value||0);}
   const tipo=document.getElementById('p-iva-tipo').value;
   const perc=parseFloat(document.getElementById('p-iva-perc').value||0);
-  const iva=tipo==='esente'?0:imp*perc/100;
+  const iva=(tipo==='esente'||tipo==='art7quater')?0:imp*perc/100;
   const tot=imp+iva;
   document.getElementById('t-imponibile').textContent=eur(imp);
   document.getElementById('t-iva').textContent=eur(iva);
@@ -1079,6 +1079,7 @@ function calcola(){
   let lbl='IVA '+perc+'%';
   if(tipo==='split')lbl='IVA '+perc+'% (scissione pagamenti – art. 17-ter)';
   if(tipo==='esente')lbl='Esente IVA';
+  if(tipo==='art7quater')lbl='Non soggetta IVA (art. 7-quater)';
   document.getElementById('t-iva-lbl').textContent=lbl;
   return {imp,iva,tot,perc,tipo};
 }
@@ -1205,13 +1206,16 @@ function _generaPDFvero(ritorna){
   let ivaLbl='IVA '+d.iva_perc+'%';
   if(d.iva_tipo==='split')ivaLbl='IVA '+d.iva_perc+'% (sciss. pag. art.17-ter)';
   if(d.iva_tipo==='esente')ivaLbl='Esente IVA';
+  if(d.iva_tipo==='art7quater')ivaLbl='Non soggetta IVA';
   tr(ivaLbl,eur(d.iva_importo),false);
+  const totSuffix=d.iva_tipo==='split'?' (IVA a carico Ente)':(d.iva_tipo==='art7quater'?' (operazione non soggetta)':' IVA INCLUSA');
   doc.setFillColor(235,240,247);doc.rect(x1,y,x4-x1,8,'F');doc.setFont('helvetica','bold');doc.setFontSize(11);
-  doc.text('TOTALE'+(d.iva_tipo==='split'?' (IVA a carico Ente)':' IVA INCLUSA'),x4-46,y+5.5,{align:'right'});doc.text(eur(d.totale),x4-2,y+5.5,{align:'right'});y+=14;
+  doc.text('TOTALE'+totSuffix,x4-46,y+5.5,{align:'right'});doc.text(eur(d.totale),x4-2,y+5.5,{align:'right'});y+=14;
   // condizioni
   doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60);
   chk(20);
   if(d.iva_tipo==='split'){doc.text('Regime IVA: operazione soggetta a scissione dei pagamenti (art. 17-ter DPR 633/72) – l\'IVA sarà versata direttamente dall\'Ente.',M,y,{maxWidth:W-2*M});y+=8;}
+  if(d.iva_tipo==='art7quater'){doc.text('Operazione non soggetta ad IVA ai sensi dell\'art. 7-quater, comma 1, lett. a) del DPR 633/72.',M,y,{maxWidth:W-2*M});y+=8;}
   if(d.validita){doc.text('Validità dell\'offerta: '+d.validita+'.',M,y,{maxWidth:W-2*M});y+=6;}
   y+=4;doc.setTextColor(20);doc.setFontSize(10);
   if(d.note_finali){const nl=doc.splitTextToSize(d.note_finali,W-2*M);chk(nl.length*5+12);doc.text(nl,M,y);y+=nl.length*5+8;}
