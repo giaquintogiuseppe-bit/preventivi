@@ -1,4 +1,4 @@
-const CACHE_NAME = 'otto8100-preventivi-v1';
+const CACHE_NAME = 'otto8100-preventivi-v2';
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -43,7 +43,21 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Per il resto (font, librerie CDN, icone): cache-first, cambiano raramente.
+  // Icone e manifest: rete-prima, così un nuovo logo pubblicato si vede subito.
+  if (url.pathname.endsWith('.png') || url.pathname.endsWith('manifest.json')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Per il resto (font, librerie CDN): cache-first, cambiano raramente.
   e.respondWith(
     caches.match(e.request).then(cached => {
       const networkFetch = fetch(e.request).then(res => {
