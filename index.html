@@ -337,7 +337,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
       <button class="btn" onclick="generaPDF()">📄 Genera PDF</button>
       <button class="bs" onclick="salvaPreventivo()">☁ Salva in archivio</button>
       <button class="bs" onclick="inviaMail()">✉ Invia via mail</button>
-      <button class="bs" id="btn-cantiere" style="display:none;background:var(--green);color:#04222b;border-color:var(--green)" onclick="apriModalCantiere()">🏗 Genera cantiere</button>
+      <button class="bs" id="btn-cantiere" style="display:none;background:var(--green);color:#04222b;border-color:var(--green)" onclick="apriModalCantiere()">🏗 Crea commessa</button>
       <div style="flex:1"></div>
       <button class="bd" id="btn-elimina" style="display:none" onclick="eliminaPreventivo()">🗑 Elimina</button>
     </div>
@@ -396,24 +396,35 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
 <div class="mo" id="modal-cantiere" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:16px">
   <div style="background:var(--card);border:1px solid var(--brd);border-radius:var(--r);max-width:460px;width:100%;padding:20px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <h2 style="font-size:16px">🏗 Genera cantiere nel planning</h2>
+      <h2 style="font-size:16px">🏗 Crea commessa dal preventivo</h2>
       <button onclick="chiudiModalCantiere()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">✕</button>
     </div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Crea un cantiere nel planning a partire da questo preventivo. Nome e date sono modificabili. Il preventivo resta invariato.</p>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Apre una commessa (con codice COM) a partire da questo preventivo, la aggancia e segna il preventivo accettato. Compare subito in Gestionale e Planning.</p>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <div><label>Nome cantiere</label><input id="mc-nome" placeholder="Es. Valmontone – ANAS" oninput="_mcMostraCandidati()"></div>
+      <div><label>Nome commessa</label><input id="mc-nome" placeholder="Es. Valmontone – ANAS" oninput="_mcMostraCandidati()"></div>
       <div><label>Committente</label><input id="mc-committente" oninput="_mcMostraCandidati()"></div>
       <div><label>Luogo</label><input id="mc-luogo" placeholder="Città / sede evento"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label>Data inizio</label><input type="date" id="mc-dal"></div>
         <div><label>Data fine</label><input type="date" id="mc-al"></div>
       </div>
-      <div><label>Ricavo previsto €</label><input type="number" step="0.01" id="mc-ricavo"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label>Ricavo previsto €</label><input type="number" step="0.01" id="mc-ricavo"></div>
+        <div><label>Tipo</label>
+          <select id="mc-tipo">
+            <option value="noleggio">Noleggio</option>
+            <option value="evento">Allestimento / Evento</option>
+            <option value="servizio">Facchinaggio / Servizio</option>
+            <option value="fornitura">Fornitura beni/servizi</option>
+            <option value="interno">Interno / Relazionale</option>
+          </select>
+        </div>
+      </div>
     </div>
     <div id="mc-avviso" style="display:none;margin-top:12px;padding:9px 12px;border-radius:var(--r2);background:rgba(201,162,39,.15);border:1px solid var(--gold);color:var(--gold);font-size:12px"></div>
     <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
       <button class="bs" onclick="chiudiModalCantiere()">Annulla</button>
-      <button class="btn" style="background:var(--green);color:#04222b" onclick="confermaGeneraCantiere()">🏗 Crea cantiere</button>
+      <button class="btn" style="background:var(--green);color:#04222b" onclick="confermaGeneraCantiere()">🏗 Crea commessa</button>
     </div>
   </div>
 </div>
@@ -740,7 +751,9 @@ async function confermaGeneraCantiere(){
   const al=document.getElementById('mc-al').value;
   const ricavo=parseFloat(document.getElementById('mc-ricavo').value||0)||0;
   const numeroPrev=document.getElementById('p-numero').value;
-  if(!nome){ toast('Dai un nome al cantiere'); return; }
+  const tipo=document.getElementById('mc-tipo')?.value||'noleggio';
+  let _codice='', _clienteIdNew='';
+  if(!nome){ toast('Dai un nome alla commessa'); return; }
   if(!dal){ toast('Inserisci almeno la data di inizio'); return; }
   // GUARD anti-doppione finale: se esiste un cantiere molto simile e non l'hai collegato, chiedo conferma
   const simili=_mcCandidati(nome, committente, numeroPrev).filter(x=>x.punteggio>=70);
@@ -751,9 +764,16 @@ async function confermaGeneraCantiere(){
       dati.cantieri=dati.cantieri||[];
       // anti-doppione forte: mai due cantieri dallo stesso preventivo
       if(dati.cantieri.find(c=>c._daPreventivo===numeroPrev||c.preventivoRef===numeroPrev)) throw new Error('già generato da questo preventivo');
+      // Codice perno COM-ANNO-NNN (dallo stesso anno della commessa)
+      const _anno=(dal||'').slice(0,4)||String(new Date().getFullYear());
+      const _reC=new RegExp('^COM-'+_anno+'-(\\d+)$'); let _maxN=0;
+      (dati.cantieri||[]).forEach(c=>{const m=(c.codice||'').match(_reC); if(m){const n=parseInt(m[1],10); if(n>_maxN)_maxN=n;}});
+      _codice='COM-'+_anno+'-'+String(_maxN+1).padStart(3,'0');
       const cantiere={
-        id:nuovoId, nome, luogo, note:'Generato dal preventivo '+numeroPrev,
-        tipo:'standard', stato:'da confermare', committente, clienteNome:committente,
+        id:nuovoId, codice:_codice, nome, luogo, note:'Generato dal preventivo '+numeroPrev,
+        tipo:'standard', tipoCant:[tipo], continuativa:false,
+        origine:'da_preventivo', preventivoId:numeroPrev,
+        stato:'da confermare', committente, clienteNome:committente,
         periodoInizio:dal, periodoFine:al||dal, ricavo,
         interventi:[], attrezzature:[], materiali:[], mezzi:[], serviziEsterni:[], personaleAssegnato:[],
         notifica:{attiva:false,giorni:2},
@@ -769,7 +789,7 @@ async function confermaGeneraCantiere(){
                referente:(document.getElementById('p-cliente-rif').value||'') };
         dati.clienti.push(_cli);
       }
-      if(_cli) cantiere.clienteId=_cli.id;
+      if(_cli){ cantiere.clienteId=_cli.id; _clienteIdNew=_cli.id; }
       dati.cantieri.push(cantiere);
       // RICAVO previsto in budgetCantieri (fonte economica del gestionale)
       dati.budgetCantieri=dati.budgetCantieri||[];
@@ -780,6 +800,12 @@ async function confermaGeneraCantiere(){
     // lato preventivo: legame bidirezionale + accettato
     await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,
       body:JSON.stringify({cantiere_id:nuovoId,cantiere_ref:nuovoId,stato:'accettato',aggiornato_il:new Date().toISOString()})});
+    // Perno: registra la commessa nella tabella condivisa (Mobile Regia, ecc.)
+    try{ await fetch(SB_URL+'/rest/v1/commesse',{method:'POST',headers:{...SB_H,'Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({id:nuovoId, codice:_codice, nome, cliente_id:_clienteIdNew||null, cliente_nome:committente||null, committente:committente||null,
+        tipo_cant:[tipo], continuativa:false, stato:'da confermare', luogo:luogo||null,
+        periodo_inizio:dal||null, periodo_fine:al||dal||null, origine:'da_preventivo', preventivo_id:numeroPrev,
+        ricavo:ricavo||null, non_fatturabile:false, archiviato:false, aggiornato_il:new Date().toISOString()})}); }catch(e){}
     // se il preventivo nasce da una richiesta (REQ-...), segna la richiesta come importata
     const _rifR=(document.getElementById('p-rif').value||'');
     const _mReq=_rifR.match(/REQ-\d{4}-\d+/);
@@ -789,7 +815,7 @@ async function confermaGeneraCantiere(){
     chiudiModalCantiere();
     await _refreshCantV();
     if(typeof renderVitaBox==='function') renderVitaBox();
-    toast('✓ Cantiere «'+nome+'» creato: cliente + budget nel gestionale');
+    toast('✓ Commessa '+_codice+' «'+nome+'» creata e agganciata al preventivo');
   }catch(e){ toast('⚠ '+String(e.message||e).slice(0,70)); }
 }
 
