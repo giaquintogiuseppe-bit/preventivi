@@ -770,6 +770,59 @@ async function collegaEsistenteDaGenera(cantId){
   }catch(e){ toast('⚠ '+String(e.message||e).slice(0,60)); }
 }
 
+// Sincronizza un preventivo ACCETTATO nella commessa collegata: lo somma come
+// voce integrativa (o come ricavo base la prima volta). Idempotente per numero
+// preventivo: rieseguirla non raddoppia (aggiorna solo se cambia l'importo).
+async function _sincronizzaVoceCantiere(p){
+  if(!p || p.stato!=='accettato') return null;
+  const numeroPrev=p.numero;
+  const imp = parseFloat(p.imponibile||0) || (typeof datiCorrenti==='function' ? (parseFloat(datiCorrenti().imponibile||0)||0) : 0);
+  if(!(imp>0)) return null;
+  const oggetto=(p.oggetto||'').trim();
+  const cantIdEsplicito=(p.cantiere_id && p.cantiere_id!=='__nessuno__' && p.cantiere_id!=='__auto__') ? p.cantiere_id : null;
+  let esito=null;
+  await _blobPatchSicuro(dati=>{
+    dati.cantieri=dati.cantieri||[];
+    // trova la commessa: per id esplicito, oppure per preventivo già agganciato
+    let c = cantIdEsplicito ? dati.cantieri.find(x=>x.id===cantIdEsplicito) : null;
+    if(!c) c = dati.cantieri.find(x=>x.preventivoRef===numeroPrev || x._daPreventivo===numeroPrev);
+    if(!c){ esito={ok:false,motivo:'nocant'}; return; }
+    dati.budgetCantieri=dati.budgetCantieri||[];
+    let b=dati.budgetCantieri.find(x=>x.cantiereId===c.id);
+    const ricavoAtt=b?(parseFloat(b.ricavoPrevisto)||0):0;
+    c.forniture=Array.isArray(c.forniture)?c.forniture:[];
+    const giaVoce=c.forniture.find(v=>v.preventivoRef===numeroPrev);
+    if(giaVoce){
+      const delta=imp-parseFloat(giaVoce.importo||0);
+      if(delta!==0){ giaVoce.importo=imp; if(b) b.ricavoPrevisto=Math.max(0,ricavoAtt+delta); }
+      esito={ok:true,tipo:'update',nome:c.nome,importo:imp}; return;
+    }
+    // Questo preventivo È il "base" della commessa (già conteggiato nel ricavo):
+    // non va riaggiunto come integrativo, altrimenti raddoppia.
+    const eBase=(c.preventivoRef===numeroPrev)||(c._daPreventivo===numeroPrev);
+    if(eBase){
+      if(ricavoAtt<=0){ if(b) b.ricavoPrevisto=imp; else dati.budgetCantieri.push({cantiereId:c.id,cantiereName:c.nome,ricavoPrevisto:imp,note:'Da preventivo '+numeroPrev}); esito={ok:true,tipo:'base',nome:c.nome,importo:imp}; }
+      else if(c.forniture.length===0 && ricavoAtt!==imp && b){ b.ricavoPrevisto=imp; esito={ok:true,tipo:'update',nome:c.nome,importo:imp}; } // base modificato, nessuna voce extra
+      else esito={ok:true,tipo:'base',nome:c.nome,importo:ricavoAtt}; // idempotente
+      return;
+    }
+    const integrativo=(ricavoAtt>0) || !!(c.preventivoRef||c._daPreventivo);
+    if(integrativo){
+      c.forniture.push({id:'forn'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+        tipo:'fornitura', descrizione:(oggetto||('Preventivo '+numeroPrev)).slice(0,80),
+        importo:imp, data:new Date().toISOString().slice(0,10), preventivoRef:numeroPrev, note:'', stato:'confermata', fonte:'preventivo'});
+      if(b) b.ricavoPrevisto=ricavoAtt+imp; else dati.budgetCantieri.push({cantiereId:c.id,cantiereName:c.nome,ricavoPrevisto:imp,note:'Voce integrativa '+numeroPrev});
+      if(!c.preventivoRef){ c._daPreventivo=numeroPrev; c.preventivoRef=numeroPrev; }
+      esito={ok:true,tipo:'integrativo',nome:c.nome,importo:imp};
+    } else {
+      c._daPreventivo=numeroPrev; c.preventivoRef=numeroPrev;
+      if(b) b.ricavoPrevisto=imp; else dati.budgetCantieri.push({cantiereId:c.id,cantiereName:c.nome,ricavoPrevisto:imp,note:'Da preventivo '+numeroPrev});
+      esito={ok:true,tipo:'base',nome:c.nome,importo:imp};
+    }
+  });
+  return esito;
+}
+
 async function confermaGeneraCantiere(){
   const nome=document.getElementById('mc-nome').value.trim();
   const committente=document.getElementById('mc-committente').value.trim();
@@ -1417,7 +1470,22 @@ async function cambiaStato(nuovo){
   const p=window._pAperto; if(!p||!_editId) return;
   try{
     await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,body:JSON.stringify({stato:nuovo,aggiornato_il:new Date().toISOString()})});
-    p.stato=nuovo; _statoCorrente=nuovo; renderVitaBox();
+    p.stato=nuovo; _statoCorrente=nuovo;
+    // Accettato → riversa il preventivo nella commessa collegata (ricavo/voce integrativa)
+    if(nuovo==='accettato'){
+      try{
+        const es=await _sincronizzaVoceCantiere(p);
+        if(es&&es.ok){
+          await _refreshCantV(); renderVitaBox();
+          toast(es.tipo==='base' ? '✓ Accettato — ricavo commessa impostato ('+eur(es.importo)+')'
+              : es.tipo==='update' ? '✓ Accettato — voce aggiornata ('+eur(es.importo)+')'
+              : '✓ Accettato — voce integrativa +'+eur(es.importo)+' su «'+es.nome+'»');
+          return;
+        }
+        if(es&&!es.ok&&es.motivo==='nocant'){ renderVitaBox(); toast('✓ Accettato — collega una commessa per aggiornare il ricavo'); return; }
+      }catch(e){ /* se la sync fallisce, lo stato resta comunque accettato */ }
+    }
+    renderVitaBox();
     toast('✓ Stato: '+nuovo);
   }catch(e){ toast('⚠ Errore cambio stato'); }
 }
@@ -1447,7 +1515,12 @@ async function scegliCollega(id){
   const val = id==='__auto__' ? null : id;
   try{
     await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,body:JSON.stringify({cantiere_id:val,aggiornato_il:new Date().toISOString()})});
-    p.cantiere_id=val; chiudiCollega(); renderVitaBox();
+    p.cantiere_id=val; chiudiCollega();
+    // se il preventivo è già accettato, collegandolo ora riversa subito il ricavo
+    if(p.stato==='accettato' && val && val!=='__nessuno__'){
+      try{ const es=await _sincronizzaVoceCantiere(p); if(es&&es.ok){ await _refreshCantV(); } }catch(e){}
+    }
+    renderVitaBox();
     const v=_vitaPrev(p);
     toast(val===null?'✓ Riconoscimento automatico':val==='__nessuno__'?'✓ Cantiere scollegato':'✓ Collegato a '+(v.cantNome||'cantiere'));
   }catch(e){ toast('⚠ Errore collegamento'); }
