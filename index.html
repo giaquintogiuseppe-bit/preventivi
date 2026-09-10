@@ -716,21 +716,46 @@ async function _refreshCantV(){
     if(d&&Array.isArray(d.cantieri)) CANT_V=d.cantieri;
   }catch(e){}
 }
-// COLLEGA il preventivo a un cantiere ESISTENTE (nessun doppione)
+// COLLEGA il preventivo a un cantiere ESISTENTE (nessun doppione).
+// Se la commessa ha già un ricavo/preventivo, questo preventivo viene trattato
+// come INTEGRATIVO: diventa una NUOVA VOCE (fornitura) che SI SOMMA al ricavo
+// previsto, senza cancellare il preventivo base né azzerare il ricavo esistente.
 async function collegaEsistenteDaGenera(cantId){
   const numeroPrev=document.getElementById('p-numero').value;
   const ricavo=parseFloat(document.getElementById('mc-ricavo').value||0)||0;
+  const oggetto=(document.getElementById('p-oggetto').value||'').trim();
   try{
-    let nomeC='';
+    let nomeC='', integrativo=false;
     await _blobPatchSicuro(dati=>{
       dati.cantieri=dati.cantieri||[];
       const c=dati.cantieri.find(x=>x.id===cantId); if(!c) throw new Error('cantiere non trovato');
       nomeC=c.nome;
-      c._daPreventivo=numeroPrev; c.preventivoRef=numeroPrev;   // filo bidirezionale
       dati.budgetCantieri=dati.budgetCantieri||[];
       let b=dati.budgetCantieri.find(x=>x.cantiereId===cantId);
-      if(!b) dati.budgetCantieri.push({cantiereId:cantId,cantiereName:c.nome,ricavoPrevisto:ricavo,note:'Da preventivo '+numeroPrev});
-      else if(!(+b.ricavoPrevisto>0) && ricavo>0){ b.ricavoPrevisto=ricavo; b.note=(b.note?b.note+' · ':'')+'agg. da preventivo '+numeroPrev; }
+      const ricavoAtt=b?(parseFloat(b.ricavoPrevisto)||0):0;
+      // Integrativo se la commessa ha già un ricavo o un preventivo base agganciato
+      integrativo=(ricavoAtt>0) || !!(c.preventivoRef||c._daPreventivo);
+      if(integrativo){
+        // anti-doppione: non aggiungere due volte lo stesso preventivo integrativo
+        c.forniture=Array.isArray(c.forniture)?c.forniture:[];
+        if(!c.forniture.find(v=>v.preventivoRef===numeroPrev)){
+          c.forniture.push({
+            id:'forn'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+            tipo:'fornitura', descrizione:(oggetto||('Preventivo '+numeroPrev)).slice(0,80),
+            importo:ricavo, data:(new Date().toISOString().slice(0,10)),
+            preventivoRef:numeroPrev, note:'', stato:'confermata', fonte:'preventivo'
+          });
+          // il ricavo previsto totale cresce della voce integrativa
+          if(b){ b.ricavoPrevisto=ricavoAtt+ricavo; }
+          else dati.budgetCantieri.push({cantiereId:cantId,cantiereName:c.nome,ricavoPrevisto:ricavo,note:'Voce integrativa '+numeroPrev});
+        }
+        if(!c.preventivoRef){ c._daPreventivo=numeroPrev; c.preventivoRef=numeroPrev; }
+      } else {
+        // caso base: primo preventivo del cantiere, imposta ricavo e filo bidirezionale
+        c._daPreventivo=numeroPrev; c.preventivoRef=numeroPrev;
+        if(!b) dati.budgetCantieri.push({cantiereId:cantId,cantiereName:c.nome,ricavoPrevisto:ricavo,note:'Da preventivo '+numeroPrev});
+        else { b.ricavoPrevisto=ricavo; b.note=(b.note?b.note+' · ':'')+'agg. da preventivo '+numeroPrev; }
+      }
     });
     await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,
       body:JSON.stringify({cantiere_id:cantId,cantiere_ref:cantId,stato:'accettato',aggiornato_il:new Date().toISOString()})});
@@ -739,7 +764,9 @@ async function collegaEsistenteDaGenera(cantId){
     chiudiModalCantiere();
     await _refreshCantV();
     if(typeof renderVitaBox==='function') renderVitaBox();
-    toast('🔗 Collegato al cantiere «'+nomeC+'» — nessun doppione creato');
+    toast(integrativo
+      ? '➕ Voce integrativa (+'+eur(ricavo)+') aggiunta a «'+nomeC+'»'
+      : '🔗 Collegato al cantiere «'+nomeC+'» — nessun doppione creato');
   }catch(e){ toast('⚠ '+String(e.message||e).slice(0,60)); }
 }
 
