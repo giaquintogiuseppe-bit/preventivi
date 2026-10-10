@@ -30,6 +30,10 @@ body{font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',san
 .bd{background:#fff;border:1px solid #e2b6b4;color:var(--red);border-radius:var(--r2);padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
 .bd:hover{background:#fbf1f0}
 .card{background:var(--card);border:1px solid var(--brd);border-radius:var(--r);padding:20px 22px;margin-bottom:14px}
+.attr-riga{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 40px;gap:8px;align-items:center;margin-bottom:6px}
+.attr-st{display:inline-block;margin-top:2px;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:rgba(185,138,46,.14);color:var(--gold)}
+.attr-in_corso{background:rgba(14,107,100,.12);color:var(--teal)}.attr-rientrata{background:rgba(47,143,111,.12);color:var(--green)}
+@media(max-width:560px){.attr-riga{grid-template-columns:minmax(0,1fr) 60px 36px}.attr-riga>div.muted:nth-child(3){grid-column:1/-1;order:5}}
 .card h2{font-family:'IBM Plex Serif',serif;font-size:16px;font-weight:600;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:9px}
 label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);font-weight:600;margin-bottom:5px}
 input,select,textarea{width:100%;background:#faf8f3;border:1px solid var(--brd);border-radius:var(--r2);color:var(--text);font-family:inherit;font-size:14px;padding:10px 11px;outline:none;transition:border-color .12s,box-shadow .12s}
@@ -321,6 +325,21 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
         <div class="tot-row"><span id="t-iva-lbl">IVA 22%</span><span class="mn" id="t-iva">€ 0,00</span></div>
         <div class="tot-row big"><span id="t-tot-lbl">TOTALE</span><span class="mn" id="t-totale">€ 0,00</span></div>
         <div class="tot-row" id="t-split-row" style="display:none;color:#b8860b;font-weight:800"><span id="t-split-lbl">A tuo carico (split payment)</span><span class="mn" id="t-split">€ 0,00</span></div>
+      </div>
+    </div>
+
+    <div class="card" id="attr-card">
+      <h2>🧰 Attrezzature necessarie <span class="muted" style="font-size:11px;font-weight:500">· uso interno, non compare nel PDF</span></h2>
+      <div class="muted" style="font-size:12px;margin-bottom:8px">Le attrezzature del catalogo Risorse che servono per eseguire il lavoro. Quando il preventivo è <b>accettato</b> con la commessa creata, partono come <b>ordine</b> al Planning (sul cantiere) e all'app Risorse (da preparare).</div>
+      <div id="attr-stato" style="display:none;margin-bottom:8px;padding:7px 10px;border-radius:var(--r2);background:rgba(14,107,100,.08);border:1px solid rgba(14,107,100,.25);font-size:12px;color:var(--teal)"></div>
+      <div class="attr-riga muted" style="font-size:11px"><div>Attrezzatura (catalogo Risorse)</div><div style="text-align:center">Q.tà</div><div></div><div></div></div>
+      <datalist id="attr-dl"></datalist>
+      <div id="attr-list"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="bs" onclick="attrAggiungi()">+ Aggiungi attrezzatura</button>
+        <button class="bs" onclick="attrSuggerisci()" title="Cerca nel catalogo le attrezzature citate nelle voci">✨ Suggerisci dalle voci</button>
+        <span style="flex:1"></span>
+        <button class="btn" id="attr-btn-ordine" style="display:none" onclick="attrInviaOrdineManuale()">📦 Invia ordine</button>
       </div>
     </div>
 
@@ -726,11 +745,11 @@ async function collegaEsistenteDaGenera(cantId){
   const ricavo=parseFloat(document.getElementById('mc-ricavo').value||0)||0;
   const oggetto=(document.getElementById('p-oggetto').value||'').trim();
   try{
-    let nomeC='', integrativo=false;
+    let nomeC='', integrativo=false, dalC='', alC='';
     await _blobPatchSicuro(dati=>{
       dati.cantieri=dati.cantieri||[];
       const c=dati.cantieri.find(x=>x.id===cantId); if(!c) throw new Error('cantiere non trovato');
-      nomeC=c.nome;
+      nomeC=c.nome; dalC=c.periodoInizio||''; alC=c.periodoFine||'';
       dati.budgetCantieri=dati.budgetCantieri||[];
       let b=dati.budgetCantieri.find(x=>x.cantiereId===cantId);
       const ricavoAtt=b?(parseFloat(b.ricavoPrevisto)||0):0;
@@ -768,6 +787,8 @@ async function collegaEsistenteDaGenera(cantId){
     toast(integrativo
       ? '➕ Voce integrativa (+'+eur(ricavo)+') aggiunta a «'+nomeC+'»'
       : '🔗 Collegato al cantiere «'+nomeC+'» — nessun doppione creato');
+    renderAttr();
+    if(ATTR.some(a=>a.risorsa_id)) await inviaOrdineAttrezzature({cantId, cantNome:nomeC, dal:dalC, al:alC}, true);
   }catch(e){ toast('⚠ '+String(e.message||e).slice(0,60)); }
 }
 
@@ -897,6 +918,8 @@ async function confermaGeneraCantiere(){
     await _refreshCantV();
     if(typeof renderVitaBox==='function') renderVitaBox();
     toast('✓ Commessa '+_codice+' «'+nome+'» creata e agganciata al preventivo');
+    renderAttr();
+    if(ATTR.some(a=>a.risorsa_id)) await inviaOrdineAttrezzature({cantId:nuovoId, cantNome:nome, dal, al:al||dal}, true);
   }catch(e){ toast('⚠ '+String(e.message||e).slice(0,70)); }
 }
 
@@ -1146,6 +1169,7 @@ async function nuovoPreventivo(){
   document.getElementById('p-data').value=new Date().toISOString().slice(0,10);
   document.getElementById('p-numero').value=await prossimoNumero();
   aggiungiVoce(); calcola();
+  ATTR=[]; ATTR_ORD=[]; _attrCatalogo().then(renderAttr); renderAttr();
 }
 
 function setModalita(m){
@@ -1214,7 +1238,8 @@ function datiCorrenti(){
     righe:MOD==='dettagliata'?VOCI.map(v=>({descrizione:v.desc,qta:v.qta,prezzo:v.prezzo})):[{descrizione:document.getElementById('p-corpo-desc').value,qta:1,prezzo:parseFloat(document.getElementById('p-corpo-imp').value||0)}],
     imponibile:c.imp,iva_tipo:c.tipo,iva_perc:c.perc,iva_importo:c.iva,totale:c.tot,a_carico_cliente:c.aCarico,
     validita:document.getElementById('p-validita').value,
-    note_finali:document.getElementById('p-note').value
+    note_finali:document.getElementById('p-note').value,
+    attrezzature:ATTR.filter(a=>a.risorsa_id||a.nome).map(a=>({risorsa_id:a.risorsa_id||null,nome:a.nome||'',qty:parseFloat(a.qty)||0,unita:a.unita||''}))
   };
 }
 
@@ -1233,6 +1258,7 @@ async function salvaPreventivo(){
       const bc=document.getElementById('btn-cantiere'); if(bc) bc.style.display='inline-block';
       const vb=document.getElementById('vita-box'); if(vb) vb.style.display='flex';
       if(typeof renderVitaBox==='function') renderVitaBox();
+      renderAttr();
     }
   }catch(e){toast('⚠ Errore salvataggio: '+String(e).slice(0,50));}
 }
@@ -1493,12 +1519,14 @@ async function cambiaStato(nuovo){
           toast(es.tipo==='base' ? '✓ Accettato — ricavo commessa impostato ('+eur(es.importo)+')'
               : es.tipo==='update' ? '✓ Accettato — voce aggiornata ('+eur(es.importo)+')'
               : '✓ Accettato — voce integrativa +'+eur(es.importo)+' su «'+es.nome+'»');
+          await _attrDopoAccettato(p); renderAttr();
           return;
         }
         if(es&&!es.ok&&es.motivo==='nocant'){ renderVitaBox(); toast('✓ Accettato — collega una commessa per aggiornare il ricavo'); return; }
       }catch(e){ /* se la sync fallisce, lo stato resta comunque accettato */ }
     }
-    renderVitaBox();
+    if(nuovo==='annullato') await _attrAnnullaOrdine();
+    renderVitaBox(); renderAttr();
     toast('✓ Stato: '+nuovo);
   }catch(e){ toast('⚠ Errore cambio stato'); }
 }
@@ -1578,6 +1606,224 @@ async function apriPreventivo(id){
     VOCI=(p.righe||[]).map(r=>({desc:r.descrizione,qta:r.qta,prezzo:r.prezzo}));renderVoci();
   }
   calcola();
+  ATTR=(Array.isArray(p.attrezzature)?p.attrezzature:[]).map(a=>Object.assign({},a)); ATTR_ORD=[]; renderAttr();
+  _attrCatalogo().then(()=>_attrCaricaOrdine()).then(renderAttr);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   ATTREZZATURE NECESSARIE → ORDINE A PLANNING / RISORSE
+   Il preventivo elenca (uso interno, non va nel PDF) le attrezzature del
+   catalogo `risorse` che servono per la commessa. Quando il preventivo è
+   ACCETTATO con la commessa creata/collegata, ogni voce diventa una
+   allocazione "programmata" sul cantiere (tabella condivisa `allocazioni`,
+   origine='preventivo', nota "Ordine da preventivo PREV-…"): il Planning la
+   vede sul cantiere, l'app Risorse la mette a disposizione.
+   Disponibilità: stessa regola dell'app Risorse (movimenti aperti e fuori
+   deposito che si sovrappongono al periodo).
+   ══════════════════════════════════════════════════════════ */
+let ATTR=[];          // [{risorsa_id,nome,qty,unita}]
+let RIS_CAT=null;     // catalogo risorse (cache)
+let ATTR_ORD=[];
+let DEP_CAT=[];      // depositi (per il nome di partenza)      // allocazioni già generate da questo preventivo
+const _ATTR_TAG=n=>'Ordine da preventivo '+n;
+function _isoOggi(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _fd(iso){ if(!iso) return '—'; const p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function _nq(n){ return (Math.round((parseFloat(n)||0)*100)/100).toLocaleString('it-IT'); }
+
+async function _attrCatalogo(force){
+  if(RIS_CAT && !force) return RIS_CAT;
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/risorse?select=id,nome,categoria,unita,qty_totale,gestione,deposito_base,matricola,attiva&order=nome.asc',{headers:SB_H,cache:'no-cache'});
+    const rows=r.ok?await r.json():[];
+    RIS_CAT=(rows||[]).filter(x=>x.attiva!==false && x.gestione!=='consumabile');
+    try{ const d=await fetch(SB_URL+'/rest/v1/depositi?select=id,nome',{headers:SB_H,cache:'no-cache'}); DEP_CAT=d.ok?await d.json():[]; }catch(e){ DEP_CAT=DEP_CAT||[]; }
+  }catch(e){ RIS_CAT=RIS_CAT||[]; }
+  return RIS_CAT;
+}
+function _attrLabel(r){
+  const dup=(RIS_CAT||[]).filter(x=>(x.nome||'').toLowerCase()===(r.nome||'').toLowerCase()).length>1;
+  return r.nome+(dup&&r.matricola?' ('+r.matricola+')':'');
+}
+function _attrRisDaLabel(lbl){
+  const l=(lbl||'').trim().toLowerCase(); if(!l) return null;
+  return (RIS_CAT||[]).find(r=>_attrLabel(r).toLowerCase()===l) || (RIS_CAT||[]).find(r=>(r.nome||'').toLowerCase()===l) || null;
+}
+// movimenti aperti (per la disponibilità) — esclude quelli generati da questo stesso preventivo
+async function _attrMovAperti(){
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/allocazioni?select=id,risorsa_id,qty,data_uscita,data_rientro,data_rientro_effettiva,stato,a_tipo,note,origine,cantiere_id&stato=not.in.(rientrata,trasferita,annullata)',{headers:SB_H,cache:'no-cache'});
+    return r.ok?await r.json():[];
+  }catch(e){ return []; }
+}
+function _attrDisp(ris, mov, d1, d2, escludiIds){
+  const tot=parseFloat(ris.qty_totale)||0; let imp=0;
+  (mov||[]).forEach(m=>{
+    if(m.risorsa_id!==ris.id || (escludiIds&&escludiIds.has(m.id))) return;
+    if(m.data_rientro_effettiva) return;
+    if(!m.a_tipo || m.a_tipo==='deposito') return;
+    const a=m.data_uscita||'0000-01-01', b=m.data_rientro||'9999-12-31';
+    if(a<=d2 && b>=d1) imp+=parseFloat(m.qty)||0;
+  });
+  return tot-imp;
+}
+
+function renderAttr(){
+  const box=document.getElementById('attr-list'); if(!box) return;
+  const dl=document.getElementById('attr-dl');
+  if(dl && RIS_CAT) dl.innerHTML=RIS_CAT.map(r=>'<option value="'+esc(_attrLabel(r))+'">'+esc((r.categoria||'')+(r.qty_totale!=null?' · tot. '+_nq(r.qty_totale)+' '+(r.unita||''):''))+'</option>').join('');
+  box.innerHTML=ATTR.length?ATTR.map((a,i)=>{
+    const r=(RIS_CAT||[]).find(x=>x.id===a.risorsa_id);
+    const ord=ATTR_ORD.find(o=>o.risorsa_id===a.risorsa_id);
+    const st=ord?('<span class="attr-st attr-'+ord.stato+'">'+({programmata:'📦 ordinata',in_corso:'🚚 uscita',rientrata:'✓ rientrata',trasferita:'↪ trasferita'}[ord.stato]||ord.stato)+(Math.abs((parseFloat(ord.qty)||0)-(parseFloat(a.qty)||0))>0.001?' ('+_nq(ord.qty)+')':'')+'</span>'):'';
+    return '<div class="attr-riga">'
+      +'<input list="attr-dl" value="'+esc(r?_attrLabel(r):(a.nome||''))+'" placeholder="Cerca nel catalogo Risorse…" onchange="attrScegli('+i+',this.value)"'+(r||!a.nome?'':' style="border-color:var(--red)"')+'>'
+      +'<input type="number" min="0" step="1" value="'+(a.qty||'')+'" oninput="ATTR['+i+'].qty=parseFloat(this.value)||0" style="text-align:center">'
+      +'<div class="muted" style="font-size:11px;line-height:1.3">'+(r?esc(r.unita||'pz')+' · tot. '+_nq(r.qty_totale):(a.nome?'⚠ non in catalogo':''))+(st?'<br>'+st:'')+'</div>'
+      +'<button class="bd" style="padding:4px 8px" onclick="ATTR.splice('+i+',1);renderAttr()">✕</button></div>';
+  }).join(''):'<div class="muted" style="font-size:12px;padding:6px 0">Nessuna attrezzatura indicata. Aggiungile dal catalogo o usa «Suggerisci dalle voci».</div>';
+  const p=window._pAperto;
+  const cantOk=p && p.cantiere_id && p.cantiere_id!=='__nessuno__' && p.cantiere_id!=='__auto__';
+  const bo=document.getElementById('attr-btn-ordine');
+  if(bo){ bo.style.display=(p&&p.stato==='accettato'&&cantOk)?'inline-block':'none'; bo.textContent=ATTR_ORD.length?'📦 Aggiorna ordine':'📦 Invia ordine'; }
+  const si=document.getElementById('attr-stato');
+  if(si){
+    if(ATTR_ORD.length){
+      const c={}; ATTR_ORD.forEach(o=>c[o.stato]=(c[o.stato]||0)+1);
+      si.innerHTML='📦 Ordine inviato a Planning/Risorse: '+Object.entries(c).map(([k,v])=>v+' '+({programmata:'da preparare',in_corso:'uscite',rientrata:'rientrate',trasferita:'trasferite'}[k]||k)).join(' · ');
+      si.style.display='block';
+    } else if(p&&p.stato==='accettato'&&cantOk&&ATTR.length){ si.innerHTML='⚠ Preventivo accettato ma ordine non ancora inviato.'; si.style.display='block'; }
+    else si.style.display='none';
+  }
+}
+async function attrAggiungi(){ await _attrCatalogo(); ATTR.push({risorsa_id:'',nome:'',qty:1,unita:''}); renderAttr(); const ins=document.querySelectorAll('#attr-list .attr-riga input[list]'); if(ins.length) ins[ins.length-1].focus(); }
+function attrScegli(i,lbl){
+  const r=_attrRisDaLabel(lbl);
+  if(!r){ ATTR[i].risorsa_id=''; ATTR[i].nome=lbl; renderAttr(); if(lbl) toast('⚠ «'+lbl+'» non è nel catalogo Risorse'); return; }
+  const gia=ATTR.findIndex((x,k)=>k!==i&&x.risorsa_id===r.id);
+  if(gia>=0){ ATTR[gia].qty=(parseFloat(ATTR[gia].qty)||0)+(parseFloat(ATTR[i].qty)||1); ATTR.splice(i,1); toast('Sommata alla voce già presente'); }
+  else Object.assign(ATTR[i],{risorsa_id:r.id,nome:r.nome,unita:r.unita||''});
+  renderAttr();
+}
+// Suggerisce le attrezzature leggendo le voci/elenco materiali (da rivedere a mano)
+async function attrSuggerisci(){
+  await _attrCatalogo();
+  const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[×]/g,'x');
+  const stem=w=>w.length>4?w.slice(0,-1):w;
+  const STOP=new Set(['con','per','dei','del','della','delle','degli','da','di','in','su','tra','fra','the','tipo','nero','nere','neri','bianco','bianche','bianchi']);
+  const tok=s=>norm(s).split(/[^a-z0-9]+/).filter(w=>w.length>=3&&!STOP.has(w)).map(stem);
+  const righe = MOD==='corpo'
+    ? (document.getElementById('p-materiali').value||'').split('\n').filter(Boolean).map(t=>({t,q:0}))
+    : VOCI.map(v=>({t:v.desc||'',q:parseFloat(v.qta)||0}));
+  let n=0;
+  righe.forEach(({t,q})=>{
+    const T=new Set(tok(t)); if(!T.size) return;
+    let best=null, bestSc=0;
+    RIS_CAT.forEach(r=>{
+      const rt=tok(r.nome); if(!rt.length) return;
+      const hit=rt.filter(w=>T.has(w)).length;
+      const sc=hit/rt.length;
+      if(hit>=1 && sc>bestSc && (sc>=0.99 || (hit>=2 && sc>=0.6))){ best=r; bestSc=sc; }
+    });
+    if(!best || ATTR.some(a=>a.risorsa_id===best.id)) return;
+    const m=norm(t).match(/\bn\.?\s*(\d+)/)||norm(t).match(/^\s*(\d+)\s/);
+    const qty = m?parseInt(m[1],10):(q>1?q:1);
+    ATTR.push({risorsa_id:best.id,nome:best.nome,qty,unita:best.unita||''}); n++;
+  });
+  renderAttr();
+  toast(n?('✨ '+n+' attrezzature suggerite: controlla nomi e quantità'):'Nessuna corrispondenza trovata nel catalogo');
+}
+async function _attrCaricaOrdine(){
+  ATTR_ORD=[];
+  const p=window._pAperto; const num=document.getElementById('p-numero').value;
+  if(!p || !num) return;
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/allocazioni?select=*&origine=eq.preventivo&note=ilike.'+encodeURIComponent('*'+_ATTR_TAG(num)+'*'),{headers:SB_H,cache:'no-cache'});
+    ATTR_ORD=r.ok?await r.json():[];
+  }catch(e){}
+}
+// Crea/aggiorna l'ordine. ctx: {cantId, cantNome, dal, al}. Ritorna un riepilogo o null.
+async function inviaOrdineAttrezzature(ctx, silenziosoSeVuoto){
+  const numero=document.getElementById('p-numero').value;
+  await _attrCatalogo(true);
+  const lista=ATTR.filter(a=>a.risorsa_id && (parseFloat(a.qty)||0)>0);
+  await _attrCaricaOrdine();
+  const miei=ATTR_ORD.filter(o=>o.cantiere_id===ctx.cantId);
+  if(!lista.length && !miei.length){ if(!silenziosoSeVuoto) toast('Nessuna attrezzatura da ordinare'); return null; }
+  const oggi=_isoOggi();
+  const uscita=(ctx.dal && ctx.dal>oggi)?ctx.dal:oggi;
+  const rientro=(ctx.al && ctx.al>=uscita)?ctx.al:null;
+  const mov=await _attrMovAperti();
+  const escl=new Set(miei.map(o=>o.id));
+  const ins=[], patch=[], del=[], righe=[], mancanze=[];
+  lista.forEach(a=>{
+    const r=RIS_CAT.find(x=>x.id===a.risorsa_id); if(!r) return;
+    const q=parseFloat(a.qty)||0;
+    const disp=_attrDisp(r, mov, uscita, rientro||uscita, escl);
+    const manca=q>disp+0.0001;
+    if(manca) mancanze.push(r.nome);
+    const ex=miei.find(o=>o.risorsa_id===r.id);
+    let az;
+    if(ex){
+      if(ex.stato!=='programmata') az='già '+(ex.stato==='in_corso'?'uscita':ex.stato)+' — invariata';
+      else if(Math.abs((parseFloat(ex.qty)||0)-q)>0.0001 || ex.data_uscita!==uscita || (ex.data_rientro||null)!==rientro){ patch.push({id:ex.id,body:{qty:q,data_uscita:uscita,data_rientro:rientro,aggiornato_il:new Date().toISOString()}}); az='aggiornata'; }
+      else az='invariata';
+    } else {
+      ins.push({risorsa_id:r.id, qty:q, deposito_id:r.deposito_base||null,
+        cantiere_id:ctx.cantId, cantiere_nome:ctx.cantNome||null,
+        data_uscita:uscita, data_rientro:rientro, stato:'programmata',
+        da_tipo:'deposito', da_id:r.deposito_base||null, da_nome:((DEP_CAT||[]).find(d=>d.id===r.deposito_base)||{}).nome||null,
+        a_tipo:'cantiere', a_id:ctx.cantId, a_nome:ctx.cantNome||null,
+        origine:'preventivo', note:_ATTR_TAG(numero)+(manca?' · ⚠ disponibilità insufficiente all\'ordine ('+_nq(disp)+')':'')});
+      az='nuova';
+    }
+    righe.push('• '+_nq(q)+' '+(r.unita||'')+' '+r.nome+'  ['+az+']'+(manca?'  ⚠ disponibili '+_nq(Math.max(0,disp)):''));
+  });
+  miei.forEach(o=>{ if(o.stato==='programmata' && !lista.some(a=>a.risorsa_id===o.risorsa_id)){ del.push(o.id); const r=RIS_CAT.find(x=>x.id===o.risorsa_id); righe.push('• '+(r?r.nome:o.risorsa_id)+'  [tolta dall\'ordine]'); } });
+  if(!ins.length && !patch.length && !del.length){ renderAttr(); toast('Ordine già aggiornato ✓'); return {nuove:0}; }
+  const msg='📦 Ordine attrezzature per «'+(ctx.cantNome||'cantiere')+'»\n'
+    +'Uscita '+_fd(uscita)+(rientro?' · rientro previsto '+_fd(rientro):'')+'\n\n'+righe.join('\n')
+    +(mancanze.length?'\n\n⚠ Disponibilità insufficiente per: '+mancanze.join(', ')+'.\nL\'ordine parte comunque e la mancanza resta segnalata.':'')
+    +'\n\nOK = invia a Planning e Risorse';
+  if(!confirm(msg)){ toast('Ordine non inviato — puoi inviarlo dopo dalla sezione Attrezzature'); renderAttr(); return null; }
+  try{
+    if(ins.length){ const r=await fetch(SB_URL+'/rest/v1/allocazioni',{method:'POST',headers:{...SB_H,Prefer:'return=minimal'},body:JSON.stringify(ins)}); if(!r.ok) throw new Error('inserimento '+r.status); }
+    for(const p of patch){ const r=await fetch(SB_URL+'/rest/v1/allocazioni?id=eq.'+p.id,{method:'PATCH',headers:SB_H,body:JSON.stringify(p.body)}); if(!r.ok) throw new Error('aggiornamento '+r.status); }
+    for(const id of del){ const r=await fetch(SB_URL+'/rest/v1/allocazioni?id=eq.'+id+'&stato=eq.programmata',{method:'DELETE',headers:SB_H}); if(!r.ok) throw new Error('rimozione '+r.status); }
+    // tieni allineata la lista salvata nel preventivo
+    if(_editId) await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,body:JSON.stringify({attrezzature:ATTR,aggiornato_il:new Date().toISOString()})});
+    await _attrCaricaOrdine(); renderAttr();
+    toast('📦 Ordine inviato: '+ins.length+' nuove, '+patch.length+' aggiornate, '+del.length+' tolte'+(mancanze.length?' · ⚠ '+mancanze.length+' con mancanza':''));
+    return {nuove:ins.length, aggiornate:patch.length, tolte:del.length, mancanze};
+  }catch(e){ toast('⚠ Ordine non inviato: '+String(e.message||e).slice(0,60)); return null; }
+}
+// Pulsante manuale (preventivo già accettato e collegato)
+async function attrInviaOrdineManuale(){
+  const p=window._pAperto; if(!p||!p.cantiere_id) return;
+  await _refreshCantV();
+  const c=(CANT_V||[]).find(x=>x.id===p.cantiere_id);
+  if(!c){ toast('⚠ Commessa collegata non trovata nel Planning'); return; }
+  await inviaOrdineAttrezzature({cantId:c.id, cantNome:c.nome, dal:c.periodoInizio, al:c.periodoFine});
+}
+// Preventivo annullato: toglie le prenotazioni ancora "da preparare"
+async function _attrAnnullaOrdine(){
+  await _attrCaricaOrdine();
+  const prog=ATTR_ORD.filter(o=>o.stato==='programmata');
+  const fuori=ATTR_ORD.filter(o=>o.stato==='in_corso');
+  if(!prog.length && !fuori.length) return;
+  if(prog.length && confirm('Il preventivo è annullato: togliere le '+prog.length+' attrezzature ordinate e non ancora uscite?'+(fuori.length?'\n('+fuori.length+' già uscite restano: gestiscile dal Planning/Risorse)':''))){
+    for(const o of prog){ try{ await fetch(SB_URL+'/rest/v1/allocazioni?id=eq.'+o.id+'&stato=eq.programmata',{method:'DELETE',headers:SB_H}); }catch(e){} }
+    await _attrCaricaOrdine(); renderAttr(); toast('Prenotazioni attrezzature tolte ✓');
+  } else if(fuori.length && !prog.length) toast('⚠ '+fuori.length+' attrezzature di questo preventivo risultano uscite');
+}
+// Dopo l'accettazione (stato cambiato a mano): se c'è la commessa collegata, propone l'ordine
+async function _attrDopoAccettato(p){
+  if(!ATTR.some(a=>a.risorsa_id)) return;
+  await _refreshCantV();
+  const real=(p.cantiere_id && p.cantiere_id!=='__nessuno__' && p.cantiere_id!=='__auto__') ? p.cantiere_id : null;
+  const c=(CANT_V||[]).find(x=>x.id===real) || (CANT_V||[]).find(x=>x.preventivoRef===p.numero||x._daPreventivo===p.numero);
+  if(!c){ toast('⚠ Attrezzature: crea o collega la commessa per inviare l\'ordine'); return; }
+  await inviaOrdineAttrezzature({cantId:c.id, cantNome:c.nome, dal:c.periodoInizio, al:c.periodoFine}, true);
 }
 
 /* ══════════════════════════════════════════════════════════
