@@ -314,12 +314,13 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
 
       <div class="tot-box">
         <div class="grid2" style="margin-bottom:8px">
-          <div><label>Regime IVA</label><select id="p-iva-tipo" onchange="calcola()"><option value="normale">IVA 22% normale</option><option value="split">Split payment (art. 17-ter, enti pubblici)</option><option value="esente">Esente / N.I.</option><option value="art7quater">Non soggetta – art. 7-quater DPR 633/72 (IVA 0)</option></select></div>
-          <div><label>Aliquota %</label><input type="number" id="p-iva-perc" value="22" oninput="calcola()"></div>
+          <div><label>Regime IVA</label><select id="p-iva-tipo" onchange="calcola()"><option value="normale">IVA con aliquota (22% default)</option><option value="split">Split payment (art. 17-ter, enti pubblici)</option><option value="esente">Esente art. 10 (IVA 0)</option><option value="ni">Non imponibile (IVA 0)</option><option value="art7quater">Non soggetta – art. 7-quater DPR 633/72 (IVA 0)</option></select></div>
+          <div><label>Aliquota %</label><input type="number" id="p-iva-perc" value="22" list="iva-perc-dl" oninput="calcola()"><datalist id="iva-perc-dl"><option value="22"><option value="10"><option value="5"><option value="4"></datalist></div>
         </div>
         <div class="tot-row"><span>Imponibile</span><span class="mn" id="t-imponibile">€ 0,00</span></div>
         <div class="tot-row"><span id="t-iva-lbl">IVA 22%</span><span class="mn" id="t-iva">€ 0,00</span></div>
-        <div class="tot-row big"><span>TOTALE</span><span class="mn" id="t-totale">€ 0,00</span></div>
+        <div class="tot-row big"><span id="t-tot-lbl">TOTALE</span><span class="mn" id="t-totale">€ 0,00</span></div>
+        <div class="tot-row" id="t-split-row" style="display:none;color:#b8860b;font-weight:800"><span id="t-split-lbl">A tuo carico (split payment)</span><span class="mn" id="t-split">€ 0,00</span></div>
       </div>
     </div>
 
@@ -1177,17 +1178,23 @@ function calcola(){
   else{imp=parseFloat(document.getElementById('p-corpo-imp').value||0);}
   const tipo=document.getElementById('p-iva-tipo').value;
   const perc=parseFloat(document.getElementById('p-iva-perc').value||0);
-  const iva=(tipo==='esente'||tipo==='art7quater')?0:imp*perc/100;
+  const senzaIva=(tipo==='esente'||tipo==='art7quater'||tipo==='ni');
+  const iva=senzaIva?0:imp*perc/100;
   const tot=imp+iva;
+  const aCarico=(tipo==='split')?imp:tot;   // split payment: il cliente versa solo l'imponibile, l'IVA la versa l'Ente
   document.getElementById('t-imponibile').textContent=eur(imp);
   document.getElementById('t-iva').textContent=eur(iva);
   document.getElementById('t-totale').textContent=eur(tot);
   let lbl='IVA '+perc+'%';
   if(tipo==='split')lbl='IVA '+perc+'% (scissione pagamenti – art. 17-ter)';
-  if(tipo==='esente')lbl='Esente IVA';
+  if(tipo==='esente')lbl='Esente IVA (art. 10)';
+  if(tipo==='ni')lbl='Non imponibile';
   if(tipo==='art7quater')lbl='Non soggetta IVA (art. 7-quater)';
   document.getElementById('t-iva-lbl').textContent=lbl;
-  return {imp,iva,tot,perc,tipo};
+  const totLbl=document.getElementById('t-tot-lbl'); if(totLbl) totLbl.textContent=(tipo==='split'?'TOTALE FATTURA':'TOTALE');
+  const sr=document.getElementById('t-split-row');
+  if(sr){ if(tipo==='split'){ sr.style.display='flex'; document.getElementById('t-split').textContent=eur(imp); } else sr.style.display='none'; }
+  return {imp,iva,tot,perc,tipo,aCarico};
 }
 
 function datiCorrenti(){
@@ -1205,7 +1212,7 @@ function datiCorrenti(){
     modalita:MOD,
     elenco_materiali:MOD==='corpo'?document.getElementById('p-materiali').value.split('\n').map(s=>s.trim()).filter(Boolean):[],
     righe:MOD==='dettagliata'?VOCI.map(v=>({descrizione:v.desc,qta:v.qta,prezzo:v.prezzo})):[{descrizione:document.getElementById('p-corpo-desc').value,qta:1,prezzo:parseFloat(document.getElementById('p-corpo-imp').value||0)}],
-    imponibile:c.imp,iva_tipo:c.tipo,iva_perc:c.perc,iva_importo:c.iva,totale:c.tot,
+    imponibile:c.imp,iva_tipo:c.tipo,iva_perc:c.perc,iva_importo:c.iva,totale:c.tot,a_carico_cliente:c.aCarico,
     validita:document.getElementById('p-validita').value,
     note_finali:document.getElementById('p-note').value
   };
@@ -1311,12 +1318,18 @@ function _generaPDFvero(ritorna){
   tr('Imponibile',eur(d.imponibile),true);
   let ivaLbl='IVA '+d.iva_perc+'%';
   if(d.iva_tipo==='split')ivaLbl='IVA '+d.iva_perc+'% (sciss. pag. art.17-ter)';
-  if(d.iva_tipo==='esente')ivaLbl='Esente IVA';
+  if(d.iva_tipo==='esente')ivaLbl='Esente IVA (art.10)';
+  if(d.iva_tipo==='ni')ivaLbl='Non imponibile';
   if(d.iva_tipo==='art7quater')ivaLbl='Non soggetta IVA';
   tr(ivaLbl,eur(d.iva_importo),false);
-  const totSuffix=d.iva_tipo==='split'?' (IVA a carico Ente)':(d.iva_tipo==='art7quater'?' (operazione non soggetta)':' IVA INCLUSA');
+  const totSuffix=d.iva_tipo==='split'?' FATTURA (IVA a carico Ente)':(d.iva_tipo==='art7quater'?' (operazione non soggetta)':((d.iva_tipo==='esente'||d.iva_tipo==='ni')?'':' IVA INCLUSA'));
   doc.setFillColor(235,240,247);doc.rect(x1,y,x4-x1,8,'F');doc.setFont('helvetica','bold');doc.setFontSize(11);
   doc.text('TOTALE'+totSuffix,x4-46,y+5.5,{align:'right'});doc.text(eur(d.totale),x4-2,y+5.5,{align:'right'});y+=14;
+  if(d.iva_tipo==='split'){
+    doc.setFillColor(250,245,225);doc.rect(x1,y-6,x4-x1,8,'F');doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(120,90,10);
+    doc.text('A Vostro carico (split payment):',x1+2,y-0.5);doc.text(eur(d.a_carico_cliente!=null?d.a_carico_cliente:d.imponibile),x4-2,y-0.5,{align:'right'});
+    doc.setTextColor(60);y+=8;
+  }
   // condizioni
   doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(60);
   chk(20);
@@ -1356,7 +1369,7 @@ function inviaMail(){
   const d=datiCorrenti();
   if(!d.cliente_nome){toast('Inserisci il cliente');return;}
   const ogg=encodeURIComponent((d.numero||'Preventivo')+' – '+(d.oggetto||'Ottantunocento'));
-  const corpo=encodeURIComponent('Spett.le '+d.cliente_nome+',\n\nin allegato il preventivo '+d.numero+' relativo a: '+(d.oggetto||'')+'.\n\nTotale: '+eur(d.totale)+(d.iva_tipo==='split'?' (IVA a carico Ente)':' IVA inclusa')+'.\nValidità: '+d.validita+'.\n\nRestiamo a disposizione.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
+  const corpo=encodeURIComponent('Spett.le '+d.cliente_nome+',\n\nin allegato il preventivo '+d.numero+' relativo a: '+(d.oggetto||'')+'.\n\nTotale: '+eur(d.totale)+(d.iva_tipo==='split'?(' (IVA a carico Ente, art.17-ter — a Vs. carico '+eur(d.a_carico_cliente!=null?d.a_carico_cliente:d.imponibile)+')'):((d.iva_tipo==='esente'||d.iva_tipo==='ni'||d.iva_tipo==='art7quater')?' (IVA non applicata)':' IVA inclusa'))+'.\nValidità: '+d.validita+'.\n\nRestiamo a disposizione.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
   const scelta=confirm('OK = invia dalla mail AZIENDALE ('+MAIL_AZIENDALE+')\nAnnulla = invia dalla mail PERSONALE ('+MAIL_PERSONALE+')');
   const from=scelta?MAIL_AZIENDALE:MAIL_PERSONALE;
   // genera anche il PDF da allegare (l'utente lo allega manualmente)
