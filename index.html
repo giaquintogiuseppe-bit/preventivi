@@ -32,6 +32,9 @@ body{font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',san
 .card{background:var(--card);border:1px solid var(--brd);border-radius:var(--r);padding:20px 22px;margin-bottom:14px}
 .attr-riga{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 40px;gap:8px;align-items:center;margin-bottom:6px}
 .attr-st{display:inline-block;margin-top:2px;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:rgba(185,138,46,.14);color:var(--gold)}
+.attr-ext{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-2px 0 4px;padding:7px 10px;border-radius:var(--r2);background:rgba(14,107,100,.06);font-size:12px}
+.attr-ext select,.attr-ext input{width:auto;min-width:180px;padding:6px 8px;font-size:12px}
+.attr-ext-todo{background:rgba(176,65,63,.08);border:1px dashed var(--red)}
 .attr-in_corso{background:rgba(14,107,100,.12);color:var(--teal)}.attr-rientrata{background:rgba(47,143,111,.12);color:var(--green)}
 @media(max-width:560px){.attr-riga{grid-template-columns:minmax(0,1fr) 60px 36px}.attr-riga>div.muted:nth-child(3){grid-column:1/-1;order:5}}
 .card h2{font-family:'IBM Plex Serif',serif;font-size:16px;font-weight:600;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:9px}
@@ -788,7 +791,7 @@ async function collegaEsistenteDaGenera(cantId){
       ? '➕ Voce integrativa (+'+eur(ricavo)+') aggiunta a «'+nomeC+'»'
       : '🔗 Collegato al cantiere «'+nomeC+'» — nessun doppione creato');
     renderAttr();
-    if(ATTR.some(a=>a.risorsa_id)) await inviaOrdineAttrezzature({cantId, cantNome:nomeC, dal:dalC, al:alC}, true);
+    if(ATTR.some(a=>a.risorsa_id||(a.nome||'').trim())) await inviaOrdineAttrezzature({cantId, cantNome:nomeC, dal:dalC, al:alC}, true);
   }catch(e){ toast('⚠ '+String(e.message||e).slice(0,60)); }
 }
 
@@ -919,7 +922,7 @@ async function confermaGeneraCantiere(){
     if(typeof renderVitaBox==='function') renderVitaBox();
     toast('✓ Commessa '+_codice+' «'+nome+'» creata e agganciata al preventivo');
     renderAttr();
-    if(ATTR.some(a=>a.risorsa_id)) await inviaOrdineAttrezzature({cantId:nuovoId, cantNome:nome, dal, al:al||dal}, true);
+    if(ATTR.some(a=>a.risorsa_id||(a.nome||'').trim())) await inviaOrdineAttrezzature({cantId:nuovoId, cantNome:nome, dal, al:al||dal}, true);
   }catch(e){ toast('⚠ '+String(e.message||e).slice(0,70)); }
 }
 
@@ -1239,7 +1242,7 @@ function datiCorrenti(){
     imponibile:c.imp,iva_tipo:c.tipo,iva_perc:c.perc,iva_importo:c.iva,totale:c.tot,a_carico_cliente:c.aCarico,
     validita:document.getElementById('p-validita').value,
     note_finali:document.getElementById('p-note').value,
-    attrezzature:ATTR.filter(a=>a.risorsa_id||a.nome).map(a=>({risorsa_id:a.risorsa_id||null,nome:a.nome||'',qty:parseFloat(a.qty)||0,unita:a.unita||''}))
+    attrezzature:ATTR.filter(a=>a.risorsa_id||a.nome).map(a=>({risorsa_id:a.risorsa_id||null,nome:a.nome||'',qty:parseFloat(a.qty)||0,unita:a.unita||'',...(a.risorsa_id?{}:{reperimento:a.reperimento||'',fornitore:a.fornitore||''})}))
   };
 }
 
@@ -1680,7 +1683,17 @@ function renderAttr(){
       +'<input list="attr-dl" value="'+esc(r?_attrLabel(r):(a.nome||''))+'" placeholder="Cerca nel catalogo Risorse…" onchange="attrScegli('+i+',this.value)"'+(r||!a.nome?'':' style="border-color:var(--red)"')+'>'
       +'<input type="number" min="0" step="1" value="'+(a.qty||'')+'" oninput="ATTR['+i+'].qty=parseFloat(this.value)||0" style="text-align:center">'
       +'<div class="muted" style="font-size:11px;line-height:1.3">'+(r?esc(r.unita||'pz')+' · tot. '+_nq(r.qty_totale):(a.nome?'⚠ non in catalogo':''))+(st?'<br>'+st:'')+'</div>'
-      +'<button class="bd" style="padding:4px 8px" onclick="ATTR.splice('+i+',1);renderAttr()">✕</button></div>';
+      +'<button class="bd" style="padding:4px 8px" onclick="ATTR.splice('+i+',1);renderAttr()">✕</button>'
+      +((!r && a.nome)?('<div class="attr-ext'+(a.reperimento?'':' attr-ext-todo')+'">'
+        +'<span>Non è in Risorse — come la reperiamo?</span>'
+        +'<select onchange="ATTR['+i+'].reperimento=this.value;renderAttr()">'
+        +'<option value=""'+(a.reperimento?'':' selected')+'>— da decidere —</option>'
+        +'<option value="noleggio"'+(a.reperimento==='noleggio'?' selected':'')+'>🏢 Noleggio da fornitore esterno</option>'
+        +'<option value="acquisto"'+(a.reperimento==='acquisto'?' selected':'')+'>🛒 La compriamo</option></select>'
+        +(a.reperimento==='noleggio'?'<input value="'+esc(a.fornitore||'')+'" placeholder="Fornitore (facoltativo)" oninput="ATTR['+i+'].fornitore=this.value">':'')
+        +(a.reperimento==='acquisto'?'<span class="muted" style="font-size:11px">all\'ordine nasce la scheda in Risorse (q.tà 0, da acquistare)</span>':'')
+        +'</div>'):'')
+      +'</div>';
   }).join(''):'<div class="muted" style="font-size:12px;padding:6px 0">Nessuna attrezzatura indicata. Aggiungile dal catalogo o usa «Suggerisci dalle voci».</div>';
   const p=window._pAperto;
   const cantOk=p && p.cantiere_id && p.cantiere_id!=='__nessuno__' && p.cantiere_id!=='__auto__';
@@ -1699,10 +1712,10 @@ function renderAttr(){
 async function attrAggiungi(){ await _attrCatalogo(); ATTR.push({risorsa_id:'',nome:'',qty:1,unita:''}); renderAttr(); const ins=document.querySelectorAll('#attr-list .attr-riga input[list]'); if(ins.length) ins[ins.length-1].focus(); }
 function attrScegli(i,lbl){
   const r=_attrRisDaLabel(lbl);
-  if(!r){ ATTR[i].risorsa_id=''; ATTR[i].nome=lbl; renderAttr(); if(lbl) toast('⚠ «'+lbl+'» non è nel catalogo Risorse'); return; }
+  if(!r){ ATTR[i].risorsa_id=''; ATTR[i].nome=lbl; renderAttr(); if(lbl) toast('«'+lbl+'» non è in Risorse: scegli se noleggiarla o comprarla'); return; }
   const gia=ATTR.findIndex((x,k)=>k!==i&&x.risorsa_id===r.id);
   if(gia>=0){ ATTR[gia].qty=(parseFloat(ATTR[gia].qty)||0)+(parseFloat(ATTR[i].qty)||1); ATTR.splice(i,1); toast('Sommata alla voce già presente'); }
-  else Object.assign(ATTR[i],{risorsa_id:r.id,nome:r.nome,unita:r.unita||''});
+  else { Object.assign(ATTR[i],{risorsa_id:r.id,nome:r.nome,unita:r.unita||''}); delete ATTR[i].reperimento; delete ATTR[i].fornitore; }
   renderAttr();
 }
 // Suggerisce le attrezzature leggendo le voci/elenco materiali (da rivedere a mano)
@@ -1747,9 +1760,16 @@ async function inviaOrdineAttrezzature(ctx, silenziosoSeVuoto){
   const numero=document.getElementById('p-numero').value;
   await _attrCatalogo(true);
   const lista=ATTR.filter(a=>a.risorsa_id && (parseFloat(a.qty)||0)>0);
+  // attrezzature NON in Risorse: chiedi come reperirle (noleggio esterno o acquisto)
+  const est=ATTR.filter(a=>!a.risorsa_id && (a.nome||'').trim() && (parseFloat(a.qty)||0)>0);
+  for(const a of est){
+    if(a.reperimento) continue;
+    a.reperimento = confirm('«'+a.nome+'» ('+_nq(a.qty)+') non è nel catalogo Risorse.\n\nOK = la COMPRIAMO (nasce la scheda in Risorse, da acquistare)\nAnnulla = NOLEGGIO da fornitore esterno') ? 'acquisto' : 'noleggio';
+  }
+  const daComprare=est.filter(a=>a.reperimento==='acquisto'), daNoleggiare=est.filter(a=>a.reperimento==='noleggio');
   await _attrCaricaOrdine();
   const miei=ATTR_ORD.filter(o=>o.cantiere_id===ctx.cantId);
-  if(!lista.length && !miei.length){ if(!silenziosoSeVuoto) toast('Nessuna attrezzatura da ordinare'); return null; }
+  if(!lista.length && !miei.length && !est.length){ if(!silenziosoSeVuoto) toast('Nessuna attrezzatura da ordinare'); return null; }
   const oggi=_isoOggi();
   const uscita=(ctx.dal && ctx.dal>oggi)?ctx.dal:oggi;
   const rientro=(ctx.al && ctx.al>=uscita)?ctx.al:null;
@@ -1780,20 +1800,47 @@ async function inviaOrdineAttrezzature(ctx, silenziosoSeVuoto){
     righe.push('• '+_nq(q)+' '+(r.unita||'')+' '+r.nome+'  ['+az+']'+(manca?'  ⚠ disponibili '+_nq(Math.max(0,disp)):''));
   });
   miei.forEach(o=>{ if(o.stato==='programmata' && !lista.some(a=>a.risorsa_id===o.risorsa_id)){ del.push(o.id); const r=RIS_CAT.find(x=>x.id===o.risorsa_id); righe.push('• '+(r?r.nome:o.risorsa_id)+'  [tolta dall\'ordine]'); } });
-  if(!ins.length && !patch.length && !del.length){ renderAttr(); toast('Ordine già aggiornato ✓'); return {nuove:0}; }
+  if(!ins.length && !patch.length && !del.length && !est.length){ renderAttr(); toast('Ordine già aggiornato ✓'); return {nuove:0}; }
   const msg='📦 Ordine attrezzature per «'+(ctx.cantNome||'cantiere')+'»\n'
     +'Uscita '+_fd(uscita)+(rientro?' · rientro previsto '+_fd(rientro):'')+'\n\n'+righe.join('\n')
+    +(daComprare.length?'\n\n🛒 Da acquistare (nuova scheda in Risorse, quantità 0):\n'+daComprare.map(a=>'• '+_nq(a.qty)+' '+a.nome).join('\n'):'')
+    +(daNoleggiare.length?'\n\n🏢 Noleggio da fornitore esterno (nei servizi esterni del cantiere):\n'+daNoleggiare.map(a=>'• '+_nq(a.qty)+' '+a.nome+(a.fornitore?' — '+a.fornitore:'')).join('\n'):'')
     +(mancanze.length?'\n\n⚠ Disponibilità insufficiente per: '+mancanze.join(', ')+'.\nL\'ordine parte comunque e la mancanza resta segnalata.':'')
     +'\n\nOK = invia a Planning e Risorse';
   if(!confirm(msg)){ toast('Ordine non inviato — puoi inviarlo dopo dalla sezione Attrezzature'); renderAttr(); return null; }
   try{
+    // 🛒 acquisto: crea la scheda in Risorse (quantità 0) e la prenota sul cantiere
+    for(const a of daComprare){
+      const dep=(DEP_CAT&&DEP_CAT[0]&&DEP_CAT[0].id)||null;
+      const nid='ris'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      const rr=await fetch(SB_URL+'/rest/v1/risorse',{method:'POST',headers:{...SB_H,Prefer:'return=minimal'},body:JSON.stringify([{id:nid, nome:a.nome.trim(), unita:a.unita||'pz', qty_totale:0, gestione:'quantita', natura:'durevole', attiva:true, deposito_base:dep, note:'Da acquistare — '+_ATTR_TAG(numero)}])});
+      if(!rr.ok) throw new Error('scheda Risorse '+rr.status);
+      a.risorsa_id=nid; a.unita=a.unita||'pz'; delete a.reperimento; delete a.fornitore;
+      RIS_CAT.push({id:nid,nome:a.nome.trim(),unita:a.unita,qty_totale:0,gestione:'quantita',deposito_base:dep});
+      ins.push({risorsa_id:nid, qty:parseFloat(a.qty)||0, deposito_id:dep, cantiere_id:ctx.cantId, cantiere_nome:ctx.cantNome||null,
+        data_uscita:uscita, data_rientro:rientro, stato:'programmata', da_tipo:'deposito', da_id:dep, da_nome:((DEP_CAT||[]).find(d=>d.id===dep)||{}).nome||null,
+        a_tipo:'cantiere', a_id:ctx.cantId, a_nome:ctx.cantNome||null, origine:'preventivo', note:_ATTR_TAG(numero)+' · ⚠ da acquistare'});
+    }
+    // 🏢 noleggio esterno: voce nei servizi esterni del cantiere (anti-doppione per preventivo+nome)
+    if(daNoleggiare.length){
+      await _blobPatchSicuro(dati=>{
+        const c=(dati.cantieri||[]).find(x=>x.id===ctx.cantId); if(!c) return;
+        c.serviziEsterni=Array.isArray(c.serviziEsterni)?c.serviziEsterni:[];
+        daNoleggiare.forEach(a=>{
+          const descr='Noleggio '+_nq(a.qty)+' '+(a.unita||'pz')+' '+a.nome.trim()+' ('+numero+')';
+          const ex=c.serviziEsterni.find(s=>s.preventivoRef===numero && s.attrezzatura===a.nome.trim());
+          if(ex){ ex.descrizione=descr; if(a.fornitore) ex.fornitore=a.fornitore; }
+          else c.serviziEsterni.push({fornitore:a.fornitore||'da individuare', descrizione:descr, tipo:'noleggio', fonte:'preventivo', preventivoRef:numero, attrezzatura:a.nome.trim()});
+        });
+      });
+    }
     if(ins.length){ const r=await fetch(SB_URL+'/rest/v1/allocazioni',{method:'POST',headers:{...SB_H,Prefer:'return=minimal'},body:JSON.stringify(ins)}); if(!r.ok) throw new Error('inserimento '+r.status); }
     for(const p of patch){ const r=await fetch(SB_URL+'/rest/v1/allocazioni?id=eq.'+p.id,{method:'PATCH',headers:SB_H,body:JSON.stringify(p.body)}); if(!r.ok) throw new Error('aggiornamento '+r.status); }
     for(const id of del){ const r=await fetch(SB_URL+'/rest/v1/allocazioni?id=eq.'+id+'&stato=eq.programmata',{method:'DELETE',headers:SB_H}); if(!r.ok) throw new Error('rimozione '+r.status); }
     // tieni allineata la lista salvata nel preventivo
     if(_editId) await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,body:JSON.stringify({attrezzature:ATTR,aggiornato_il:new Date().toISOString()})});
     await _attrCaricaOrdine(); renderAttr();
-    toast('📦 Ordine inviato: '+ins.length+' nuove, '+patch.length+' aggiornate, '+del.length+' tolte'+(mancanze.length?' · ⚠ '+mancanze.length+' con mancanza':''));
+    toast('📦 Ordine inviato: '+ins.length+' nuove, '+patch.length+' aggiornate, '+del.length+' tolte'+(daNoleggiare.length?' · 🏢 '+daNoleggiare.length+' a noleggio esterno':'')+(mancanze.length?' · ⚠ '+mancanze.length+' con mancanza':''));
     return {nuove:ins.length, aggiornate:patch.length, tolte:del.length, mancanze};
   }catch(e){ toast('⚠ Ordine non inviato: '+String(e.message||e).slice(0,60)); return null; }
 }
@@ -1818,7 +1865,7 @@ async function _attrAnnullaOrdine(){
 }
 // Dopo l'accettazione (stato cambiato a mano): se c'è la commessa collegata, propone l'ordine
 async function _attrDopoAccettato(p){
-  if(!ATTR.some(a=>a.risorsa_id)) return;
+  if(!ATTR.some(a=>a.risorsa_id||(a.nome||'').trim())) return;
   await _refreshCantV();
   const real=(p.cantiere_id && p.cantiere_id!=='__nessuno__' && p.cantiere_id!=='__auto__') ? p.cantiere_id : null;
   const c=(CANT_V||[]).find(x=>x.id===real) || (CANT_V||[]).find(x=>x.preventivoRef===p.numero||x._daPreventivo===p.numero);
