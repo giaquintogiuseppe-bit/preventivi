@@ -404,6 +404,16 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
   </div>
 </div>
 
+<div class="mo" id="m-revisioni" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--card);border:1px solid var(--brd);border-radius:var(--r);max-width:460px;width:100%;padding:20px;max-height:82vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h2 style="font-size:16px">📜 Storico revisioni</h2>
+      <button onclick="chiudiStoricoRevisioni()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Ogni «🔄 Aggiorna commessa» che cambia l'imponibile crea una revisione e riallinea il ricavo nella scheda commessa del Gestionale.</p>
+    <div id="revisioni-lista" style="flex:1;overflow-y:auto;border:1px solid var(--brd);border-radius:8px"></div>
+  </div>
+</div>
 <div class="mo" id="m-collega" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:16px">
   <div style="background:var(--card);border:1px solid var(--brd);border-radius:var(--r);max-width:460px;width:100%;padding:20px;max-height:82vh;display:flex;flex-direction:column">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -846,6 +856,83 @@ async function _sincronizzaVoceCantiere(p){
     }
   });
   return esito;
+}
+
+// ── AGGIORNA COMMESSA NEL GESTIONALE + STORICO REVISIONI ──
+// Modifichi un preventivo già ACCETTATO con cantiere aperto → questo riallinea il
+// ricavo della commessa (budgetCantieri nel blob gestionale_dati, con lock
+// ottimistico) all'imponibile attuale e registra una revisione (rev.1, rev.2, …).
+async function aggiornaCommessaGestionale(){
+  const p=window._pAperto;
+  if(!p||!_editId){ toast('Apri e salva prima il preventivo'); return; }
+  if(p.stato!=='accettato'){ toast('Solo i preventivi accettati aggiornano la commessa'); return; }
+  const impPrec=parseFloat(p.imponibile||0)||0;          // imponibile prima di questa modifica
+  const d=datiCorrenti();
+  const impNew=parseFloat(d.imponibile||0)||0;
+  // 1) persisti le modifiche correnti del preventivo
+  try{
+    await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,
+      body:JSON.stringify({...d,aggiornato_il:new Date().toISOString()})});
+    Object.assign(p,d);
+  }catch(e){ toast('⚠ Errore salvataggio: '+String(e.message||e).slice(0,50)); return; }
+  // 2) sincronizza il ricavo nella commessa collegata
+  let es;
+  try{ es=await _sincronizzaVoceCantiere(p); }
+  catch(e){ toast('⚠ '+String(e.message||e).slice(0,60)); return; }
+  if(!es){ toast('Niente da sincronizzare'); return; }
+  if(!es.ok){ toast(es.motivo==='nocant'?'⚠ Nessuna commessa collegata: collega prima un cantiere (🔗)':'⚠ Sincronizzazione non riuscita'); return; }
+  // 3) registra la revisione SOLO se l'imponibile è davvero cambiato
+  if(Math.abs(impNew-impPrec)<0.005){
+    await _refreshCantV(); renderVitaBox();
+    toast('La commessa «'+(es.nome||'')+'» è già allineata (imponibile invariato)');
+    return;
+  }
+  const revs=Array.isArray(p.revisioni)?p.revisioni.slice():[];
+  const nRev=(parseInt(p.rev,10)||revs.length||0)+1;
+  revs.push({ rev:nRev, data:new Date().toISOString(),
+    imponibile:impNew, imponibile_prec:impPrec, totale:parseFloat(d.totale||0)||0,
+    righe_n:(d.righe||[]).length, tipo:es.tipo||'', commessa:es.nome||'' });
+  try{
+    await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,
+      body:JSON.stringify({rev:nRev,revisioni:revs,aggiornato_il:new Date().toISOString()})});
+    p.rev=nRev; p.revisioni=revs;
+  }catch(e){ /* la commessa è già aggiornata: la revisione non è critica */ }
+  await _refreshCantV(); renderVitaBox();
+  const delta=impNew-impPrec;
+  toast('✓ Commessa «'+(es.nome||'')+'» aggiornata → rev.'+nRev+' ('+(delta>=0?'+':'')+eur(delta)+')');
+}
+function apriStoricoRevisioni(){
+  if(!window._pAperto) return;
+  renderStoricoRevisioni();
+  const m=document.getElementById('m-revisioni'); if(m) m.style.display='flex';
+}
+function chiudiStoricoRevisioni(){ const m=document.getElementById('m-revisioni'); if(m) m.style.display='none'; }
+function renderStoricoRevisioni(){
+  const p=window._pAperto; const cont=document.getElementById('revisioni-lista'); if(!cont) return;
+  const revs=(Array.isArray(p&&p.revisioni)?p.revisioni:[]).slice().sort((a,b)=>(b.rev||0)-(a.rev||0));
+  if(!revs.length){ cont.innerHTML='<div style="padding:14px;color:var(--text2);font-size:12px">Nessuna revisione registrata. Modifica il preventivo e premi «🔄 Aggiorna commessa» per crearne una.</div>'; return; }
+  const piuVecchia=revs[revs.length-1];
+  const baseImp=(piuVecchia && piuVecchia.imponibile_prec!=null)?piuVecchia.imponibile_prec:null;
+  let h=revs.map(r=>{
+    const delta=(r.imponibile_prec!=null)?(parseFloat(r.imponibile||0)-parseFloat(r.imponibile_prec||0)):null;
+    const col=delta==null?'var(--text2,#8a94a6)':delta>0?'var(--teal,#00B4A6)':'#e0795f';
+    const dt=r.data?new Date(r.data).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    return `<div style="padding:10px 12px;border-bottom:1px solid var(--brd,#24344d)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+        <b style="font-size:13px">rev.${r.rev}</b>
+        <span style="font-size:11px;color:var(--text2,#8a94a6)">${esc(dt)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:3px">
+        <span style="font-size:12px">Imponibile <b>${eur(r.imponibile)}</b>${r.imponibile_prec!=null?` <span style="color:var(--text2,#8a94a6)">(prec. ${eur(r.imponibile_prec)})</span>`:''}</span>
+        ${delta!=null?`<span style="font-size:12px;font-weight:700;color:${col}">${delta>=0?'+':''}${eur(delta)}</span>`:''}
+      </div>
+      ${r.commessa?`<div style="font-size:10.5px;color:var(--text2,#8a94a6);margin-top:2px">→ commessa «${esc(r.commessa)}»${r.righe_n?' · '+r.righe_n+' voci':''}</div>`:''}
+    </div>`;
+  }).join('');
+  if(baseImp!=null){
+    h+=`<div style="padding:10px 12px;opacity:.75"><b style="font-size:13px">originale</b> <span style="font-size:12px;color:var(--text2,#8a94a6)">— imponibile accettato ${eur(baseImp)}</span></div>`;
+  }
+  cont.innerHTML=h;
 }
 
 async function confermaGeneraCantiere(){
@@ -1518,7 +1605,22 @@ function renderVitaBox(){
     +'<label style="font-size:10px;color:var(--text2,#8a94a6);text-transform:uppercase">Stato</label>'
     +'<select onchange="cambiaStato(this.value)" style="background:var(--navy,#0a1628);border:1px solid var(--brd,#24344d);border-radius:7px;color:var(--text,#e0e6ed);font-size:12px;padding:4px 8px">'
     +stati.map(s=>`<option value="${s}"${s===(p.stato||'bozza')?' selected':''}>${s}</option>`).join('')+'</select>'
-    +'<span onclick="apriCollega()" style="cursor:pointer;font-size:11px;color:var(--gold,#C9A227)">🔗 '+(v.manuale?'cantiere collegato a mano':'collega cantiere')+'</span>';
+    +'<span onclick="apriCollega()" style="cursor:pointer;font-size:11px;color:var(--gold,#C9A227)">🔗 '+(v.manuale?'cantiere collegato a mano':'collega cantiere')+'</span>'
+    +_vitaAzioniCommessa(p,v);
+}
+// Azioni commessa nel box "vita del lavoro": pulsante "Aggiorna commessa" (solo se
+// accettato + cantiere collegato) e link allo storico revisioni.
+function _vitaAzioniCommessa(p,v){
+  if(p.stato!=='accettato') return '';
+  const nRev=(p.revisioni&&p.revisioni.length)?p.revisioni.length:(parseInt(p.rev,10)||0);
+  let h='';
+  if(v.cant){
+    h+='<button onclick="aggiornaCommessaGestionale()" title="Riallinea il ricavo della commessa nel Gestionale all\'imponibile attuale del preventivo e registra una revisione" style="background:rgba(0,180,166,.14);border:1px solid var(--teal,#00B4A6);border-radius:7px;color:var(--teal,#00B4A6);font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer">🔄 Aggiorna commessa</button>';
+  }
+  if(nRev>0){
+    h+='<span onclick="apriStoricoRevisioni()" style="cursor:pointer;font-size:11px;color:var(--gold,#C9A227)" title="Storico delle revisioni sincronizzate con il Gestionale">📜 rev.'+nRev+'</span>';
+  }
+  return h;
 }
 async function cambiaStato(nuovo){
   const p=window._pAperto; if(!p||!_editId) return;
