@@ -278,6 +278,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
         <select id="cli-select" onchange="selezionaCliente()" style="flex:1;min-width:200px"><option value="">— Scegli dall'archivio o compila sotto —</option></select>
         <button class="bs" onclick="salvaClienteNuovo()">💾 Salva questo cliente</button>
       </div>
+      <div id="cli-ref-info" style="display:none;font-size:12px;margin:-2px 0 10px;padding:6px 10px;border-radius:8px;background:rgba(0,180,166,.1);border:1px solid rgba(0,180,166,.3);color:var(--teal)"></div>
       <div class="fg">
         <div class="full"><label>Denominazione / Ente</label><input id="p-cliente" placeholder="Es. Comune di Cellole"></div>
         <div class="full"><label>Indirizzo</label><input id="p-cliente-ind" placeholder="Via..., CAP Città (PR)"></div>
@@ -308,6 +309,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
         <div class="riga-voce muted"><div>Descrizione</div><div>Q.tà</div><div>Prezzo €</div><div>Importo €</div><div></div></div>
         <div id="voci-list"></div>
         <button class="bs" onclick="aggiungiVoce()" style="margin-top:6px">+ Aggiungi voce</button>
+        <button class="bs" onclick="aggiungiVoce('Prestazione di sola manodopera',1,0);calcola()" style="margin-top:6px" title="Aggiunge una riga di sola manodopera">🛠 Riga manodopera</button>
       </div>
 
       <div id="mod-corpo" style="display:none">
@@ -1198,12 +1200,17 @@ async function init(){
 }
 
 // ── CLIENTI: dal gestionale (blob) + tabella clienti_preventivi ──
+let REFPREV={};   // referente id → nome (per mostrare "fa capo a …")
+async function _caricaReferentiPrev(){
+  try{ const r=await fetch(SB_URL+'/rest/v1/referenti?select=id,nome',{headers:SB_H,cache:'no-cache'}); const d=await r.json(); REFPREV={}; (Array.isArray(d)?d:[]).forEach(x=>{ if(x&&x.id) REFPREV[x.id]=x.nome; }); }catch(e){}
+}
 async function caricaClienti(){
   let out=[];
+  await _caricaReferentiPrev();
   try{
     const r=await fetch(SB_URL+'/rest/v1/gestionale_dati?id=eq.unico&select=dati',{headers:SB_H});
     const rows=await r.json(); let dati=rows[0] && rows[0].dati; if(typeof dati==='string')dati=JSON.parse(dati);
-    (dati && dati.clienti||[]).forEach(c=>out.push({nome:c.ragioneSociale,indirizzo:c.indirizzo,piva:c.piva,riferimento:c.referente,fonte:'gestionale'}));
+    (dati && dati.clienti||[]).forEach(c=>out.push({nome:c.ragioneSociale,indirizzo:c.indirizzo,piva:c.piva,riferimento:c.referente,referenteId:c.referenteId||'',fonte:'gestionale'}));
   }catch(e){}
   try{
     const r=await fetch(SB_URL+'/rest/v1/clienti_preventivi?select=*',{headers:SB_H});
@@ -1222,6 +1229,13 @@ function selezionaCliente(){
   document.getElementById('p-cliente-ind').value=c.indirizzo||'';
   document.getElementById('p-cliente-piva').value=c.piva||'';
   document.getElementById('p-cliente-rif').value=c.riferimento||'';
+  // mostra il referente (testa del rapporto) a cui fa capo questa società
+  const info=document.getElementById('cli-ref-info');
+  if(info){
+    const refNome = c.referenteId && REFPREV[c.referenteId] ? REFPREV[c.referenteId] : '';
+    if(refNome){ info.style.display='block'; info.innerHTML='👤 Fa capo a <b>'+esc(refNome)+'</b> — il preventivo e la commessa rientreranno nel suo cruscotto nel Gestionale.'; }
+    else { info.style.display='none'; info.innerHTML=''; }
+  }
 }
 async function salvaClienteNuovo(){
   const nome=document.getElementById('p-cliente').value.trim(); if(!nome){toast('Inserisci la denominazione');return;}

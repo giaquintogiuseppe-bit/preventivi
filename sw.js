@@ -1,4 +1,4 @@
-const CACHE_NAME = 'otto8100-preventivi-v9';
+const CACHE_NAME = 'otto8100-preventivi-v10';
 
 self.addEventListener('install', e => {
   e.waitUntil(
