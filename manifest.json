@@ -1,7 +1,7 @@
 {
   "name": "81|00 Preventivi",
   "short_name": "81|00 Preventivi",
-  "description": "Generazione preventivi PREV-YYYY-NNN con PDF e archivio — Ottantunocento S.n.c.",
+  "description": "Generazione preventivi PREV-YYYY-NNN con PDF e archivio — Ottantunocento S.r.l.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#152238",

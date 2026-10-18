@@ -100,23 +100,57 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
   function salva(j){ setSess({ access_token:j.access_token, refresh_token:j.refresh_token,
     expires_at: j.expires_at || (Math.floor(Date.now()/1000) + (j.expires_in||3600)) }); }
 
-  // ── fetch patchato: inietta il token utente sulle chiamate Supabase ──────
-  window.fetch = function(input, init){
-    try{
-      var url = (typeof input === 'string') ? input : (input && input.url) || '';
-      if(url.indexOf(SB_URL) === 0 && url.indexOf('/auth/v1/') < 0){
-        var s = getSess();
-        if(s && s.access_token){
-          var h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
-          h.set('apikey', SB_ANON);
-          h.set('Authorization', 'Bearer ' + s.access_token);
-          init = Object.assign({}, init, { headers: h });
-          if(typeof input !== 'string') input = input.url;   // usa l'URL così vincono i nostri header
-        }
+  // ── rinnovo automatico del token (scade ogni ~60 min) ────────────────────
+  var _rinnovoInCorso = null;
+  function rinnova(forza){
+    var s = getSess();
+    if(!s || !s.refresh_token) return Promise.resolve(false);
+    if(!forza && s.expires_at && (Date.now()/1000 < s.expires_at - 300)) return Promise.resolve(true);
+    if(_rinnovoInCorso) return _rinnovoInCorso;
+    _rinnovoInCorso = _fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
+      method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':SB_ANON },
+      body: JSON.stringify({ refresh_token: s.refresh_token })
+    }).then(function(r){ return r.json().then(function(j){
+      if(r.ok && j.access_token){
+        setSess({ access_token:j.access_token, refresh_token:j.refresh_token,
+              expires_at: j.expires_at || (Math.floor(Date.now()/1000) + (j.expires_in||3600)) });
+        return true;
       }
-    }catch(e){}
-    return _fetch(input, init);
+      return false;
+    }); }).catch(function(){ return false; })
+      .then(function(ok){ _rinnovoInCorso = null; return ok; });
+    return _rinnovoInCorso;
+  }
+  function conToken(input, init){
+    var s = getSess();
+    if(!s || !s.access_token) return [input, init];
+    var h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
+    h.set('apikey', SB_ANON);
+    h.set('Authorization', 'Bearer ' + s.access_token);
+    return [ (typeof input !== 'string') ? input.url : input, Object.assign({}, init, { headers: h }) ];   // usa l'URL così vincono i nostri header
+  }
+
+  // ── fetch patchato: inietta il token utente sulle chiamate Supabase ──────
+  // Rinnova il token prima che scada e, se il server risponde 401, lo rinnova e riprova una volta.
+  window.fetch = function(input, init){
+    var url = '';
+    try{ url = (typeof input === 'string') ? input : (input && input.url) || ''; }catch(e){}
+    if(url.indexOf(SB_URL) !== 0 || url.indexOf('/auth/v1/') >= 0 || !getSess()) return _fetch(input, init);
+    return rinnova(false).then(function(){
+      var a = conToken(input, init);
+      return _fetch(a[0], a[1]).then(function(r){
+        if(r.status !== 401 || !(getSess()||{}).refresh_token) return r;
+        return rinnova(true).then(function(ok){
+          if(!ok) return r;
+          var b = conToken(input, init);
+          return _fetch(b[0], b[1]);
+        });
+      });
+    });
   };
+  // controllo anche al rientro nell'app e ogni 5 minuti
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) rinnova(false); });
+  setInterval(function(){ rinnova(false); }, 5*60*1000);
 
   // ── chiamate auth diritte (niente librerie) ──────────────────────────────
   function login(email, password){
@@ -238,6 +272,15 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
     if(document.body) ins(); else document.addEventListener('DOMContentLoaded', ins);
   }
 
+  // logout globale utilizzabile dalle app: window.logout81()
+  // (definito prima dell'avvio: col return anticipato non veniva mai creato)
+  window.logout81 = function(){
+    try{ window.localStorage.removeItem(LSK); }catch(e){}
+    try{ window.sessionStorage.removeItem(LSK); }catch(e){}
+    try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}  // toglie il token del reset dall'URL
+    location.reload();
+  };
+
   // ── avvio: sessione valida? refresh? altrimenti login ────────────────────
   function mostra(){ if(document.body) overlay(); else document.addEventListener('DOMContentLoaded', overlay); }
   var s=getSess();
@@ -249,13 +292,6 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
     }).catch(function(){ mostra(); });
   } else { mostra(); }
 
-  // logout globale utilizzabile dalle app: window.logout81()
-  window.logout81 = function(){
-    try{ window.localStorage.removeItem(LSK); }catch(e){}
-    try{ window.sessionStorage.removeItem(LSK); }catch(e){}
-    try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}  // toglie il token del reset dall'URL
-    location.reload();
-  };
 })();
 </script>
 
@@ -1235,13 +1271,17 @@ async function salvaClienteNuovo(){
 }
 
 // ── NUMERAZIONE progressiva ──
+// Anno corrente e massimo NUMERICO dei soli preventivi di quell'anno
+// (prima l'anno era fisso "2026": dal 2027 ogni nuovo preventivo sarebbe stato rifiutato come doppione)
 async function prossimoNumero(){
+  const anno=new Date().getFullYear();
   try{
-    const r=await fetch(SB_URL+'/rest/v1/preventivi?select=numero&order=numero.desc&limit=1',{headers:SB_H});
+    const r=await fetch(SB_URL+'/rest/v1/preventivi?select=numero&numero=like.PREV-'+anno+'-*',{headers:SB_H});
     const rows=await r.json();
-    let n=0; if(rows[0] && rows[0].numero){const m=rows[0].numero.match(/(\d+)$/);if(m)n=parseInt(m[1]);}
-    return 'PREV-2026-'+String(n+1).padStart(3,'0');
-  }catch(e){return 'PREV-2026-001';}
+    let n=0;
+    (Array.isArray(rows)?rows:[]).forEach(x=>{ const m=String(x.numero||'').match(/-(\d+)$/); if(m) n=Math.max(n,parseInt(m[1],10)); });
+    return 'PREV-'+anno+'-'+String(n+1).padStart(3,'0');
+  }catch(e){return 'PREV-'+anno+'-001';}
 }
 
 async function nuovoPreventivo(){
@@ -1256,7 +1296,7 @@ async function nuovoPreventivo(){
   document.getElementById('p-note').value='Restando a disposizione per eventuali sopralluoghi ed ogni ulteriore chiarimento, si porgono distinti saluti.';
   document.getElementById('p-validita').value='30 giorni dalla data del presente preventivo';
   document.getElementById('p-iva-tipo').value='normale'; document.getElementById('p-iva-perc').value=22;
-  document.getElementById('p-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('p-data').value=_isoOggi();
   document.getElementById('p-numero').value=await prossimoNumero();
   aggiungiVoce(); calcola();
   ATTR=[]; ATTR_ORD=[]; _attrCatalogo().then(renderAttr); renderAttr();
@@ -1347,7 +1387,14 @@ async function salvaPreventivo(){
       const rows=await r.json().catch(()=>[]);
       if(!Array.isArray(rows)||!rows.length) throw new Error('nessuna riga aggiornata (sessione scaduta? esci e rientra)');
     } else {
-      const r=await fetch(SB_URL+'/rest/v1/preventivi',{method:'POST',headers:{...SB_H,Prefer:'return=representation'},body:JSON.stringify(d)});
+      let r=await fetch(SB_URL+'/rest/v1/preventivi',{method:'POST',headers:{...SB_H,Prefer:'return=representation'},body:JSON.stringify(d)});
+      if(r.status===409){
+        // numero già preso nel frattempo (altra scheda o altra app): ne prendo uno nuovo e riprovo una volta
+        const vecchio=d.numero; d.numero=await prossimoNumero();
+        document.getElementById('p-numero').value=d.numero;
+        toast('ℹ '+vecchio+' era già usato: salvo come '+d.numero);
+        r=await fetch(SB_URL+'/rest/v1/preventivi',{method:'POST',headers:{...SB_H,Prefer:'return=representation'},body:JSON.stringify(d)});
+      }
       if(!r.ok) throw new Error(await _err(r));
       const row=(await r.json())[0]; if(!row||!row.id) throw new Error('il database non ha restituito il preventivo salvato');
       _editId=row.id;
