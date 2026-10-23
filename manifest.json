@@ -1,7 +1,7 @@
 {
-  "name": "81|00 Preventivi",
-  "short_name": "81|00 Preventivi",
-  "description": "Generazione preventivi PREV-YYYY-NNN con PDF e archivio — Ottantunocento S.n.c.",
+  "name": "Amministrazione 81|00",
+  "short_name": "Amm. 81|00",
+  "description": "Preventivi, consuntivi e documenti aziendali Ottantunocento — PDF su carta intestata e archivio.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#152238",

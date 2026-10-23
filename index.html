@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>81|00 Preventivi</title>
+<title>Amministrazione 81|00</title>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=2">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2">
@@ -82,7 +82,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
   'use strict';
   // ── CONFIG (cambia solo queste per ogni app) ─────────────────────────────
   var MODE = 'email';                 // 'email' oppure 'pin'
-  var APP  = 'Preventivi 81|00';
+  var APP  = 'Amministrazione 81|00';
   // ── COSTANTI ECOSISTEMA (uguali per tutte) ───────────────────────────────
   var SB_URL  = 'https://xqbhujcnjvwbwzpwjujf.supabase.co';
   var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxYmh1amNuanZ3Ynd6cHdqdWpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzM4ODUsImV4cCI6MjA5NzMwOTg4NX0.VstO3aII143jpPXjgKg0t3du-yc5rS9xs2hYko_2DRs';
@@ -264,11 +264,12 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
 <body>
 <div class="wrap">
   <div class="top">
-    <div style="flex:1"><h1>📄 81|00 Preventivi</h1><div class="sub">OTTANTUNOCENTO S.R.L. · generazione e archivio preventivi</div></div>
+    <div style="flex:1"><h1>🗂 Amministrazione 81|00</h1><div class="sub">OTTANTUNOCENTO S.R.L. · preventivi · consuntivi · documenti</div></div>
     <button class="bs" onclick="vista('richieste')">📥 Richieste</button>
-    <button class="bs" onclick="vista('lista')">📁 Archivio</button>
+    <button class="bs" onclick="vista('lista')">📁 Preventivi</button>
+    <button class="bs" onclick="vista('consarchivio')">📊 Consuntivi</button>
     <button class="bs" onclick="vista('docarchivio')">🗂 Documenti</button>
-    <button class="btn" onclick="nuovoPreventivo()">+ Nuovo</button>
+    <button class="btn" onclick="nuovoPreventivo()">+ Nuovo prev.</button>
   </div>
 
   <!-- VISTA EDITOR -->
@@ -364,6 +365,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
       <button class="bs" onclick="salvaPreventivo()">☁ Salva in archivio</button>
       <button class="bs" onclick="inviaMail()">✉ Invia via mail</button>
       <button class="bs" id="btn-cantiere" style="display:none;background:var(--green);color:#04222b;border-color:var(--green)" onclick="apriModalCantiere()">🏗 Crea commessa</button>
+      <button class="bs" id="btn-consuntivo" style="display:none;background:var(--gold,#C9A227);color:#1a1200;border-color:var(--gold,#C9A227)" onclick="creaConsuntivoDaCorrente()" title="Crea il consuntivo finale di questo lavoro, collegato al preventivo e alla commessa">📊 Crea consuntivo</button>
       <div style="flex:1"></div>
       <button class="bd" id="btn-elimina" style="display:none" onclick="eliminaPreventivo()">🗑 Elimina</button>
     </div>
@@ -609,6 +611,114 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
       </select>
     </div>
     <div id="lista-doc"></div>
+  </div>
+</div>
+
+<!-- ══════════ CONSUNTIVO LAVORI (editor) ══════════ -->
+<div id="v-consuntivo" style="display:none">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2>📊 Consuntivo lavori</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="bs" onclick="vista('consarchivio')">📚 Archivio consuntivi</button>
+        <button class="btn" onclick="nuovoConsuntivo()">➕ Nuovo</button>
+      </div>
+    </div>
+    <div id="cons-link" style="display:none;font-size:12px;margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.35);color:var(--gold,#C9A227)"></div>
+  </div>
+
+  <div class="card">
+    <h2>🏛 Cliente</h2>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <select id="c-cli-select" onchange="consSelCliente()" style="flex:1;min-width:200px"><option value="">— Scegli dall'archivio o compila sotto —</option></select>
+    </div>
+    <div class="fg">
+      <div class="full"><label>Denominazione / Ente</label><input id="c-cliente" placeholder="Es. Comune di Cellole"></div>
+      <div class="full"><label>Indirizzo</label><input id="c-cliente-ind" placeholder="Via..., CAP Città (PR)"></div>
+      <div><label>P.IVA / C.F.</label><input id="c-cliente-piva"></div>
+      <div><label>Riferimento (Alla c.a.)</label><input id="c-cliente-rif" placeholder="Dott. ..."></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Dati consuntivo</h2>
+    <div class="fg">
+      <div><label>Numero</label><input id="c-numero" readonly style="opacity:.7"></div>
+      <div><label>Data</label><input type="date" id="c-data"></div>
+      <div class="full"><label>Oggetto</label><textarea id="c-oggetto" rows="2" placeholder="Consuntivo dei lavori eseguiti – Evento ..."></textarea></div>
+      <div class="full"><label>Introduzione</label><textarea id="c-intro" rows="2" placeholder="A conclusione dei lavori, si trasmette il presente consuntivo delle attività effettivamente svolte..."></textarea></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>💰 Voci effettive</h2>
+    <div class="tabs">
+      <div class="tab on" id="c-tab-dett" onclick="consSetMod('dettagliata')">Righe dettagliate</div>
+      <div class="tab" id="c-tab-corpo" onclick="consSetMod('corpo')">Fornitura a corpo</div>
+    </div>
+    <div id="c-mod-dettagliata">
+      <div class="riga-voce muted"><div>Descrizione</div><div>Q.tà</div><div>Prezzo €</div><div>Importo €</div><div></div></div>
+      <div id="c-voci-list"></div>
+      <button class="bs" onclick="consAddVoce()" style="margin-top:6px">+ Aggiungi voce</button>
+      <button class="bs" onclick="consAddVoce('Prestazione di sola manodopera',1,0);consCalcola()" style="margin-top:6px" title="Aggiunge una riga di sola manodopera">🛠 Riga manodopera</button>
+    </div>
+    <div id="c-mod-corpo" style="display:none">
+      <label>Elenco materiali (una voce per riga, diventano puntini elenco)</label>
+      <textarea id="c-materiali" rows="6" placeholder="n. 9 gazebo m 3x3 con pedana&#10;n. 1 palco m 6x4"></textarea>
+      <div class="grid2" style="margin-top:10px">
+        <div><label>Descrizione riga a corpo</label><input id="c-corpo-desc" placeholder="Lavori eseguiti per l'evento ... – a corpo"></div>
+        <div><label>Importo a corpo €</label><input type="number" id="c-corpo-imp" step="0.01" oninput="consCalcola()"></div>
+      </div>
+    </div>
+    <div class="tot-box">
+      <div class="grid2" style="margin-bottom:8px">
+        <div><label>Regime IVA</label><select id="c-iva-tipo" onchange="consCalcola()"><option value="normale">IVA con aliquota (22% default)</option><option value="split">Split payment (art. 17-ter, enti pubblici)</option><option value="esente">Esente art. 10 (IVA 0)</option><option value="ni">Non imponibile (IVA 0)</option><option value="art7quater">Non soggetta – art. 7-quater DPR 633/72 (IVA 0)</option></select></div>
+        <div><label>Aliquota %</label><input type="number" id="c-iva-perc" value="22" list="iva-perc-dl" oninput="consCalcola()"></div>
+      </div>
+      <div class="tot-row"><span>Imponibile</span><span class="mn" id="c-t-imponibile">€ 0,00</span></div>
+      <div class="tot-row"><span id="c-t-iva-lbl">IVA 22%</span><span class="mn" id="c-t-iva">€ 0,00</span></div>
+      <div class="tot-row big"><span id="c-t-tot-lbl">TOTALE</span><span class="mn" id="c-t-totale">€ 0,00</span></div>
+      <div class="tot-row" id="c-t-split-row" style="display:none;color:#b8860b;font-weight:800"><span>A carico cliente (split payment)</span><span class="mn" id="c-t-split">€ 0,00</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📝 Note</h2>
+    <div class="fg">
+      <div class="full"><label>Note finali</label><textarea id="c-note" rows="2" placeholder="Si resta a disposizione per ogni chiarimento."></textarea></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:30px">
+    <button class="btn" onclick="consGenPDF()">📄 Genera PDF</button>
+    <button class="bs" onclick="salvaConsuntivo()">☁ Salva in archivio</button>
+    <button class="bs" onclick="inviaMailConsuntivo()">✉ Invia via mail</button>
+    <div style="flex:1"></div>
+    <button class="bd" id="c-btn-elimina" style="display:none" onclick="eliminaConsuntivo()">🗑 Elimina</button>
+  </div>
+</div>
+
+<!-- ══════════ ARCHIVIO CONSUNTIVI ══════════ -->
+<div id="v-consarchivio" style="display:none">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2>📚 Archivio consuntivi</h2>
+      <div style="display:flex;gap:8px">
+        <button class="bs" onclick="caricaConsuntivi()">🔄</button>
+        <button class="btn" onclick="nuovoConsuntivo()">➕ Nuovo</button>
+      </div>
+    </div>
+    <div id="cons-kpi" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <input id="cons-cerca" placeholder="🔍 Cerca numero, cliente, oggetto, commessa..." oninput="renderConsuntivi()" style="flex:1;min-width:180px">
+      <select id="cons-filtro" onchange="renderConsuntivi()">
+        <option value="">Tutti gli stati</option>
+        <option value="bozza">Bozza</option>
+        <option value="definitivo">Definitivo</option>
+        <option value="inviato">Inviato</option>
+      </select>
+    </div>
+    <div id="lista-cons"></div>
   </div>
 </div>
 
@@ -1020,11 +1130,12 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 function eur(n){return '€ '+parseFloat(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function vista(v){
-  const mappa={editor:'v-editor',lista:'v-lista',richieste:'v-richieste',documenti:'v-documenti',docarchivio:'v-docarchivio'};
+  const mappa={editor:'v-editor',lista:'v-lista',richieste:'v-richieste',documenti:'v-documenti',docarchivio:'v-docarchivio',consuntivo:'v-consuntivo',consarchivio:'v-consarchivio'};
   Object.keys(mappa).forEach(k=>{const el=document.getElementById(mappa[k]); if(el) el.style.display=(v===k)?'block':'none';});
   if(v==='lista')caricaLista();
   if(v==='richieste')caricaRichieste();
   if(v==='docarchivio')caricaDocumenti();
+  if(v==='consarchivio')caricaConsuntivi();
   try{window.scrollTo(0,0);}catch(e){}
 }
 
@@ -1263,6 +1374,7 @@ async function nuovoPreventivo(){
   _editId=null; VOCI=[]; MOD='dettagliata'; _prevDaRichiesta=null;
   const be=document.getElementById('btn-elimina'); if(be) be.style.display='none';
   const bc=document.getElementById('btn-cantiere'); if(bc) bc.style.display='none';
+  const bco=document.getElementById('btn-consuntivo'); if(bco) bco.style.display='none';
   const vb=document.getElementById('vita-box'); if(vb) vb.style.display='none';
   vista('editor'); setModalita('dettagliata');
   document.getElementById('cli-select').value='';
@@ -1373,6 +1485,7 @@ async function salvaPreventivo(){
     if(_editId){
       window._pAperto=Object.assign(window._pAperto||{}, d, {id:_editId, stato:(window._pAperto&&window._pAperto.stato)||_statoCorrente||d.stato||'bozza'});
       const bc=document.getElementById('btn-cantiere'); if(bc) bc.style.display='inline-block';
+      const bco=document.getElementById('btn-consuntivo'); if(bco) bco.style.display='inline-block';
       const vb=document.getElementById('vita-box'); if(vb) vb.style.display='flex';
       if(typeof renderVitaBox==='function') renderVitaBox();
       renderAttr();
@@ -1457,7 +1570,7 @@ footer .tri i{display:block}
 function _ciEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function _ciMline(s){return _ciEsc(s).replace(/\n/g,'<br>');}
 function _ciNum(n){return parseFloat(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function _ciTipo(d){const n=(d.numero||'').toUpperCase();return n.indexOf('OFF')===0?'Offerta':'Preventivo';}
+function _ciTipo(d){const n=(d.numero||'').toUpperCase();return n.indexOf('CONS')===0?'Consuntivo':(n.indexOf('OFF')===0?'Offerta':'Preventivo');}
 function _ciDataEstesa(iso){if(!iso)return '';const dt=new Date(iso);if(isNaN(dt))return iso;return dt.toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'});}
 
 function _ciFooter(){
@@ -1940,6 +2053,7 @@ async function apriPreventivo(id){
   renderVitaBox();
   const be=document.getElementById('btn-elimina'); if(be) be.style.display='inline-block';
   const bc=document.getElementById('btn-cantiere'); if(bc) bc.style.display='inline-block';
+  const bco=document.getElementById('btn-consuntivo'); if(bco) bco.style.display='inline-block';
   document.getElementById('p-numero').value=p.numero;
   document.getElementById('p-data').value=p.data;
   document.getElementById('p-cliente').value=p.cliente_nome||'';
@@ -2549,6 +2663,264 @@ function inviaMailDoc(){
   const corpo=('Spett.le '+(d.destinatario_nome||'')+',\n\nin allegato '+t.label.toLowerCase()+' '+(d.numero||'')+(d.oggetto?' relativa a: '+d.oggetto:'')+'.\n\nCordiali saluti.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
   if(!d.corpo.trim()){toast('⚠ Il documento è vuoto');return;}
   generaPDFDoc(false,{titolo:ogg,testo:corpo,mailto:'mailto:?subject='+encodeURIComponent(ogg)+'&body='+encodeURIComponent(corpo)});
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONSUNTIVI — documento finale del lavoro, collegato a preventivo→commessa→cliente
+// Tabella Supabase: consuntivi. Editor autonomo: non tocca il flusso preventivo.
+// ═══════════════════════════════════════════════════════════
+let CONS=[];                 // archivio consuntivi caricato
+let C_VOCI=[];               // righe dell'editor consuntivo
+let C_MOD='dettagliata';
+let _consId=null;            // id (uuid) del consuntivo aperto, o null se nuovo
+let _consMeta={};            // {preventivo_id, preventivo_numero, cantiere_id, cantiere_nome}
+
+function consFillClienti(){
+  const sel=document.getElementById('c-cli-select'); if(!sel) return;
+  sel.innerHTML='<option value="">— Scegli dall\'archivio o compila sotto —</option>'+(CLIENTI||[]).map((c,i)=>'<option value="'+i+'">'+esc(c.nome)+'</option>').join('');
+}
+function consSelCliente(){
+  const i=document.getElementById('c-cli-select').value; if(i==='')return;
+  const c=CLIENTI[i]; if(!c)return;
+  document.getElementById('c-cliente').value=c.nome||'';
+  document.getElementById('c-cliente-ind').value=c.indirizzo||'';
+  document.getElementById('c-cliente-piva').value=c.piva||'';
+  document.getElementById('c-cliente-rif').value=c.riferimento||'';
+}
+function consSetMod(m){
+  C_MOD=m;
+  document.getElementById('c-tab-dett').classList.toggle('on',m==='dettagliata');
+  document.getElementById('c-tab-corpo').classList.toggle('on',m==='corpo');
+  document.getElementById('c-mod-dettagliata').style.display=m==='dettagliata'?'block':'none';
+  document.getElementById('c-mod-corpo').style.display=m==='corpo'?'block':'none';
+  consCalcola();
+}
+function consAddVoce(desc,qta,prezzo){ C_VOCI.push({desc:desc||'',qta:qta||1,prezzo:prezzo||0}); consRenderVoci(); }
+function consRenderVoci(){
+  document.getElementById('c-voci-list').innerHTML=C_VOCI.map((v,i)=>`
+    <div class="riga-voce">
+      <input value="${esc(v.desc)}" placeholder="Descrizione..." oninput="C_VOCI[${i}].desc=this.value">
+      <input type="number" value="${v.qta}" oninput="C_VOCI[${i}].qta=parseFloat(this.value)||0;consCalcola()" style="text-align:center">
+      <input type="number" step="0.01" value="${v.prezzo}" oninput="C_VOCI[${i}].prezzo=parseFloat(this.value)||0;consCalcola()">
+      <div class="mn" style="font-size:13px;padding-right:4px">${eur(v.qta*v.prezzo)}</div>
+      <button class="bd" style="padding:4px 8px" onclick="C_VOCI.splice(${i},1);consRenderVoci();consCalcola()">✕</button>
+    </div>`).join('');
+}
+function consCalcola(){
+  let imp=0;
+  if(C_MOD==='dettagliata'){imp=C_VOCI.reduce((s,v)=>s+(v.qta*v.prezzo),0);}
+  else{imp=parseFloat(document.getElementById('c-corpo-imp').value||0);}
+  const tipo=document.getElementById('c-iva-tipo').value;
+  const perc=parseFloat(document.getElementById('c-iva-perc').value||0);
+  const senzaIva=(tipo==='esente'||tipo==='art7quater'||tipo==='ni');
+  const iva=senzaIva?0:imp*perc/100;
+  const tot=imp+iva;
+  const aCarico=(tipo==='split')?imp:tot;
+  document.getElementById('c-t-imponibile').textContent=eur(imp);
+  document.getElementById('c-t-iva').textContent=eur(iva);
+  document.getElementById('c-t-totale').textContent=eur(tot);
+  let lbl='IVA '+perc+'%';
+  if(tipo==='split')lbl='IVA '+perc+'% (scissione pagamenti – art. 17-ter)';
+  if(tipo==='esente')lbl='Esente IVA (art. 10)';
+  if(tipo==='ni')lbl='Non imponibile';
+  if(tipo==='art7quater')lbl='Non soggetta IVA (art. 7-quater)';
+  document.getElementById('c-t-iva-lbl').textContent=lbl;
+  const totLbl=document.getElementById('c-t-tot-lbl'); if(totLbl) totLbl.textContent=(tipo==='split'?'TOTALE FATTURA':'TOTALE');
+  const sr=document.getElementById('c-t-split-row');
+  if(sr){ if(tipo==='split'){ sr.style.display='flex'; document.getElementById('c-t-split').textContent=eur(imp); } else sr.style.display='none'; }
+  return {imp,iva,tot,perc,tipo,aCarico};
+}
+function consDati(){
+  const c=consCalcola();
+  return {
+    numero:document.getElementById('c-numero').value,
+    data:document.getElementById('c-data').value,
+    cliente_nome:document.getElementById('c-cliente').value,
+    cliente_indirizzo:document.getElementById('c-cliente-ind').value,
+    cliente_piva:document.getElementById('c-cliente-piva').value,
+    cliente_riferimento:document.getElementById('c-cliente-rif').value,
+    oggetto:document.getElementById('c-oggetto').value,
+    intro:document.getElementById('c-intro').value,
+    modalita:C_MOD,
+    elenco_materiali:C_MOD==='corpo'?document.getElementById('c-materiali').value.split('\n').map(s=>s.trim()).filter(Boolean):[],
+    righe:C_MOD==='dettagliata'?C_VOCI.map(v=>({descrizione:v.desc,qta:v.qta,prezzo:v.prezzo})):[{descrizione:document.getElementById('c-corpo-desc').value,qta:1,prezzo:parseFloat(document.getElementById('c-corpo-imp').value||0)}],
+    imponibile:c.imp, iva_tipo:c.tipo, iva_perc:c.perc, iva_importo:c.iva, totale:c.tot, a_carico_cliente:c.aCarico,
+    note_finali:document.getElementById('c-note').value
+  };
+}
+function consRenderLink(){
+  const box=document.getElementById('cons-link'); if(!box) return;
+  const m=_consMeta||{}; const parts=[];
+  if(m.preventivo_numero) parts.push('dal preventivo <b>'+esc(m.preventivo_numero)+'</b>');
+  if(m.cantiere_nome) parts.push('commessa <b>'+esc(m.cantiere_nome)+'</b>');
+  if(parts.length){ box.style.display='block'; box.innerHTML='🔗 Collegato '+parts.join(' · '); }
+  else { box.style.display='none'; box.innerHTML=''; }
+}
+async function consProssimoNumero(){
+  const anno=new Date().getFullYear();
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/consuntivi?select=numero&numero=like.CONS-'+anno+'-*&order=numero.desc&limit=1',{headers:SB_H,cache:'no-cache'});
+    const rows=await r.json();
+    let n=0; if(rows[0]&&rows[0].numero){const mm=rows[0].numero.match(/(\d+)$/);if(mm)n=parseInt(mm[1]);}
+    return 'CONS-'+anno+'-'+String(n+1).padStart(3,'0');
+  }catch(e){ return 'CONS-'+anno+'-001'; }
+}
+function _consResetEditor(){
+  document.getElementById('c-cli-select').value='';
+  ['c-cliente','c-cliente-ind','c-cliente-piva','c-cliente-rif','c-oggetto','c-intro','c-materiali','c-corpo-desc','c-corpo-imp','c-note'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  document.getElementById('c-iva-tipo').value='normale'; document.getElementById('c-iva-perc').value=22;
+  document.getElementById('c-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('c-btn-elimina').style.display='none';
+}
+async function nuovoConsuntivo(){
+  _consId=null; _consMeta={}; C_VOCI=[]; C_MOD='dettagliata';
+  consFillClienti(); _consResetEditor();
+  document.getElementById('c-intro').value='A conclusione delle attività, si trasmette il presente consuntivo dei lavori effettivamente eseguiti:';
+  document.getElementById('c-note').value='Si resta a disposizione per ogni ulteriore chiarimento.';
+  document.getElementById('c-numero').value=await consProssimoNumero();
+  vista('consuntivo'); consSetMod('dettagliata'); C_VOCI=[]; consAddVoce(); consCalcola(); consRenderLink();
+}
+function creaConsuntivoDaCorrente(){
+  if(!_editId || !window._pAperto){ toast('Apri e salva prima il preventivo'); return; }
+  nuovoConsuntivoDaPreventivo(window._pAperto);
+}
+async function nuovoConsuntivoDaPreventivo(p){
+  if(!p){ toast('Preventivo non trovato'); return; }
+  _consId=null; C_VOCI=[]; C_MOD=p.modalita||'dettagliata';
+  _consMeta={ preventivo_id:p.id||null, preventivo_numero:p.numero||'', cantiere_id:p.cantiere_id||null, cantiere_nome:p.cantiere_nome||p.cantiere_ref||'' };
+  consFillClienti(); _consResetEditor();
+  document.getElementById('c-cliente').value=p.cliente_nome||'';
+  document.getElementById('c-cliente-ind').value=p.cliente_indirizzo||'';
+  document.getElementById('c-cliente-piva').value=p.cliente_piva||'';
+  document.getElementById('c-cliente-rif').value=p.cliente_riferimento||'';
+  document.getElementById('c-oggetto').value=p.oggetto?('Consuntivo lavori – '+p.oggetto):'';
+  document.getElementById('c-intro').value='A conclusione delle attività relative al preventivo '+(p.numero||'')+', si trasmette il presente consuntivo dei lavori effettivamente eseguiti:';
+  document.getElementById('c-note').value='Si resta a disposizione per ogni ulteriore chiarimento.';
+  document.getElementById('c-iva-tipo').value=p.iva_tipo||'normale';
+  document.getElementById('c-iva-perc').value=p.iva_perc||22;
+  document.getElementById('c-numero').value=await consProssimoNumero();
+  if(C_MOD==='corpo'){
+    document.getElementById('c-materiali').value=(p.elenco_materiali||[]).join('\n');
+    document.getElementById('c-corpo-desc').value=(p.righe&&p.righe[0]&&p.righe[0].descrizione)||'';
+    document.getElementById('c-corpo-imp').value=(p.righe&&p.righe[0]&&p.righe[0].prezzo)||p.imponibile||0;
+  } else {
+    C_VOCI=(p.righe||[]).map(r=>({desc:r.descrizione,qta:r.qta,prezzo:r.prezzo}));
+  }
+  vista('consuntivo'); consSetMod(C_MOD); consRenderVoci(); consCalcola(); consRenderLink();
+  toast('Consuntivo precompilato dal preventivo '+(p.numero||'')+' — inserisci i valori reali');
+}
+async function salvaConsuntivo(){
+  const d=consDati();
+  if(!d.cliente_nome){ toast('Inserisci il cliente'); return; }
+  const payload=Object.assign({}, d, {
+    preventivo_id:_consMeta.preventivo_id||null,
+    preventivo_numero:_consMeta.preventivo_numero||null,
+    cantiere_id:_consMeta.cantiere_id||null,
+    cantiere_nome:_consMeta.cantiere_nome||null,
+    aggiornato_il:new Date().toISOString()
+  });
+  const _err=async r=>{ let m='HTTP '+r.status; try{ const j=await r.json(); m=(j&&(j.message||j.hint||j.details))||m; }catch(e){} return m; };
+  try{
+    if(_consId){
+      const r=await fetch(SB_URL+'/rest/v1/consuntivi?id=eq.'+_consId,{method:'PATCH',headers:Object.assign({},SB_H,{Prefer:'return=representation'}),body:JSON.stringify(payload)});
+      if(!r.ok) throw new Error(await _err(r));
+      const rows=await r.json().catch(()=>[]);
+      if(!Array.isArray(rows)||!rows.length) throw new Error('nessuna riga aggiornata (sessione scaduta? esci e rientra)');
+    } else {
+      payload.creato_da=MAIL_PERSONALE;
+      const r=await fetch(SB_URL+'/rest/v1/consuntivi',{method:'POST',headers:Object.assign({},SB_H,{Prefer:'return=representation'}),body:JSON.stringify(payload)});
+      if(!r.ok) throw new Error(await _err(r));
+      const row=(await r.json())[0]; if(!row||!row.id) throw new Error('il database non ha restituito il consuntivo salvato');
+      _consId=row.id;
+      document.getElementById('c-btn-elimina').style.display='inline-block';
+    }
+    toast('✓ Consuntivo '+d.numero+' salvato');
+  }catch(e){ const m=String((e&&e.message)||e); toast('⚠ NON salvato: '+m.slice(0,90)); console.error('salvaConsuntivo',e); }
+}
+async function eliminaConsuntivo(){
+  if(!_consId){ toast('Consuntivo non ancora salvato'); return; }
+  if(!confirm('Eliminare definitivamente questo consuntivo dall\'archivio?')) return;
+  try{ await fetch(SB_URL+'/rest/v1/consuntivi?id=eq.'+_consId,{method:'DELETE',headers:SB_H});
+    toast('✓ Consuntivo eliminato'); _consId=null; await caricaConsuntivi(); vista('consarchivio');
+  }catch(e){ toast('⚠ Errore eliminazione'); }
+}
+function consGenPDF(){
+  const d=consDati();
+  if(!d.cliente_nome){ toast('Inserisci il cliente'); return; }
+  if(typeof _ciStampa==='function'){ _ciStampa(d); }
+  else { toast('Modulo PDF non disponibile'); }
+}
+function inviaMailConsuntivo(){
+  const d=consDati();
+  if(!d.cliente_nome){ toast('Inserisci il cliente'); return; }
+  const ogg=encodeURIComponent((d.numero||'Consuntivo')+(d.oggetto?' – '+d.oggetto:''));
+  const corpo=encodeURIComponent('Spett.le '+d.cliente_nome+',\n\nin allegato il consuntivo '+(d.numero||'')+' dei lavori eseguiti'+(d.oggetto?' relativo a: '+d.oggetto:'')+'.\n\nTotale: '+eur(d.totale)+'.\n\nCordiali saluti.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
+  window.location.href='mailto:?subject='+ogg+'&body='+corpo;
+  toast('Allega il PDF generato prima di inviare');
+}
+async function caricaConsuntivi(){
+  consFillClienti();
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/consuntivi?select=*&order=creato_il.desc',{headers:SB_H,cache:'no-cache'});
+    CONS=await r.json(); if(!Array.isArray(CONS)) CONS=[];
+  }catch(e){ CONS=[]; toast('⚠ Errore caricamento archivio consuntivi'); }
+  renderConsuntivi();
+}
+function renderConsuntivi(){
+  const box=document.getElementById('lista-cons'); if(!box) return;
+  const kpi=document.getElementById('cons-kpi');
+  const q=(document.getElementById('cons-cerca').value||'').toLowerCase();
+  const f=document.getElementById('cons-filtro').value||'';
+  if(kpi){
+    const tot=CONS.reduce((s,c)=>s+(parseFloat(c.totale)||0),0);
+    kpi.innerHTML='<div style="background:var(--card,#152438);border:1px solid var(--brd,#24344d);border-radius:10px;padding:8px 12px;font-size:12px">Consuntivi: <b>'+CONS.length+'</b></div>'+
+      '<div style="background:var(--card,#152438);border:1px solid var(--brd,#24344d);border-radius:10px;padding:8px 12px;font-size:12px">Totale: <b>'+eur(tot)+'</b></div>';
+  }
+  let lista=CONS.slice();
+  if(f) lista=lista.filter(c=>(c.stato||'bozza')===f);
+  if(q) lista=lista.filter(c=>((c.numero||'')+' '+(c.cliente_nome||'')+' '+(c.oggetto||'')+' '+(c.cantiere_nome||'')+' '+(c.preventivo_numero||'')).toLowerCase().includes(q));
+  if(!lista.length){ box.innerHTML='<div class="muted" style="padding:18px;text-align:center">Nessun consuntivo in archivio.</div>'; return; }
+  box.innerHTML=lista.map(c=>{
+    const dt=c.data?new Date(c.data).toLocaleDateString('it-IT'):'';
+    const link=[c.preventivo_numero?('← '+esc(c.preventivo_numero)):'',c.cantiere_nome?('🏗 '+esc(c.cantiere_nome)):''].filter(Boolean).join(' · ');
+    return '<div onclick="apriConsuntivo(\''+c.id+'\')" style="cursor:pointer;border:1px solid var(--brd);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:160px"><b>'+esc(c.numero||'(senza numero)')+'</b> <span class="muted" style="font-size:11px">'+esc(dt)+'</span>'+
+        '<div style="font-size:12px;color:var(--text2,#8a94a6)">'+esc(c.cliente_nome||'')+(c.oggetto?' — '+esc(c.oggetto):'')+'</div>'+
+        (link?'<div style="font-size:10.5px;color:var(--gold,#C9A227);margin-top:2px">'+link+'</div>':'')+
+      '</div>'+
+      '<div class="mn" style="font-weight:700">'+eur(c.totale)+'</div>'+
+    '</div>';
+  }).join('');
+}
+async function apriConsuntivo(id){
+  let c=CONS.find(x=>String(x.id)===String(id));
+  if(!c){ try{ const r=await fetch(SB_URL+'/rest/v1/consuntivi?id=eq.'+id+'&select=*',{headers:SB_H}); c=(await r.json())[0]; }catch(e){} }
+  if(!c){ toast('Consuntivo non trovato'); return; }
+  _consId=c.id;
+  _consMeta={ preventivo_id:c.preventivo_id, preventivo_numero:c.preventivo_numero, cantiere_id:c.cantiere_id, cantiere_nome:c.cantiere_nome };
+  C_MOD=c.modalita||'dettagliata';
+  consFillClienti();
+  document.getElementById('c-cli-select').value='';
+  document.getElementById('c-numero').value=c.numero||'';
+  document.getElementById('c-data').value=c.data||'';
+  document.getElementById('c-cliente').value=c.cliente_nome||'';
+  document.getElementById('c-cliente-ind').value=c.cliente_indirizzo||'';
+  document.getElementById('c-cliente-piva').value=c.cliente_piva||'';
+  document.getElementById('c-cliente-rif').value=c.cliente_riferimento||'';
+  document.getElementById('c-oggetto').value=c.oggetto||'';
+  document.getElementById('c-intro').value=c.intro||'';
+  document.getElementById('c-note').value=c.note_finali||'';
+  document.getElementById('c-iva-tipo').value=c.iva_tipo||'normale';
+  document.getElementById('c-iva-perc').value=c.iva_perc||22;
+  if(C_MOD==='corpo'){
+    document.getElementById('c-materiali').value=(c.elenco_materiali||[]).join('\n');
+    document.getElementById('c-corpo-desc').value=(c.righe&&c.righe[0]&&c.righe[0].descrizione)||'';
+    document.getElementById('c-corpo-imp').value=(c.righe&&c.righe[0]&&c.righe[0].prezzo)||c.imponibile||0;
+  } else {
+    C_VOCI=(c.righe||[]).map(r=>({desc:r.descrizione,qta:r.qta,prezzo:r.prezzo}));
+  }
+  document.getElementById('c-btn-elimina').style.display='inline-block';
+  vista('consuntivo'); consSetMod(C_MOD); consRenderVoci(); consCalcola(); consRenderLink();
 }
 
 init();

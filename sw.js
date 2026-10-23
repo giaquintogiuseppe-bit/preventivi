@@ -1,4 +1,4 @@
-const CACHE_NAME = 'otto8100-preventivi-v12';
+const CACHE_NAME = 'otto8100-amministrazione-v13';
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -20,15 +20,9 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // solo GET, solo stessa origine o CDN note
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
-  // per Supabase e Google API: sempre rete, non cachare (dati vivi)
   if (url.hostname.includes('supabase') || url.hostname.includes('google') || url.hostname.includes('googleapis')) return;
-
-  // Per la pagina principale (navigazione e index.html): rete-prima,
-  // così ogni aggiornamento pubblicato su GitHub si vede già alla prima
-  // apertura — la cache serve solo come fallback quando sei offline.
   const isPagina = e.request.mode === 'navigate' || url.pathname.endsWith('index.html') || url.pathname.endsWith('/');
   if (isPagina) {
     e.respondWith(
@@ -42,22 +36,6 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-
-  // Icone e manifest: rete-prima, così un nuovo logo pubblicato si vede subito.
-  if (url.pathname.endsWith('.png') || url.pathname.endsWith('manifest.json')) {
-    e.respondWith(
-      fetch(e.request).then(res => {
-        if (res && res.status === 200) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => caches.match(e.request))
-    );
-    return;
-  }
-
-  // Per il resto (font, librerie CDN): cache-first, cambiano raramente.
   e.respondWith(
     caches.match(e.request).then(cached => {
       const networkFetch = fetch(e.request).then(res => {
