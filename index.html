@@ -430,6 +430,20 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
     <div id="collega-lista" style="flex:1;overflow-y:auto;border:1px solid var(--brd);border-radius:8px"></div>
   </div>
 </div>
+<div class="mo" id="m-prevpick" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--card);border:1px solid var(--brd);border-radius:var(--r);max-width:540px;width:100%;padding:20px;max-height:82vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h2 style="font-size:16px">📊 Nuovo consuntivo da preventivo</h2>
+      <button onclick="chiudiPickerPreventivo()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Scegli il preventivo (o lavoro approvato) da cui partire: il consuntivo erediterà cliente, commessa e voci, da correggere con i valori reali.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <input id="prevpick-cerca" placeholder="🔍 Cerca numero, cliente, oggetto..." oninput="renderPrevPick()" style="flex:1;min-width:160px">
+      <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="prevpick-soloappr" onchange="renderPrevPick()"> solo approvati</label>
+    </div>
+    <div id="prevpick-lista" style="flex:1;overflow-y:auto;border:1px solid var(--brd);border-radius:8px"></div>
+  </div>
+</div>
 
 <div class="mo" id="modal-cantiere" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:16px">
   <div style="background:var(--card);border:1px solid var(--brd);border-radius:var(--r);max-width:460px;width:100%;padding:20px">
@@ -621,6 +635,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
       <h2>📊 Consuntivo lavori</h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="bs" onclick="vista('consarchivio')">📚 Archivio consuntivi</button>
+        <button class="bs" onclick="apriPickerPreventivo()">📄 Da preventivo</button>
         <button class="btn" onclick="nuovoConsuntivo()">➕ Nuovo</button>
       </div>
     </div>
@@ -705,6 +720,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
       <h2>📚 Archivio consuntivi</h2>
       <div style="display:flex;gap:8px">
         <button class="bs" onclick="caricaConsuntivi()">🔄</button>
+        <button class="bs" onclick="apriPickerPreventivo()">📄 Da preventivo</button>
         <button class="btn" onclick="nuovoConsuntivo()">➕ Nuovo</button>
       </div>
     </div>
@@ -2921,6 +2937,57 @@ async function apriConsuntivo(id){
   }
   document.getElementById('c-btn-elimina').style.display='inline-block';
   vista('consuntivo'); consSetMod(C_MOD); consRenderVoci(); consCalcola(); consRenderLink();
+}
+
+// ── Selettore: nuovo consuntivo partendo da un preventivo / lavoro approvato ──
+let _PREVPICK=[];
+let _PREVPICK_DONE=new Set();
+const _consApprov=s=>['accettato','approvato'].includes(String(s||'').toLowerCase());
+async function apriPickerPreventivo(){
+  const m=document.getElementById('m-prevpick'); if(m) m.style.display='flex';
+  const box=document.getElementById('prevpick-lista'); if(box) box.innerHTML='<div style="padding:16px;color:var(--text2);font-size:12px">Caricamento…</div>';
+  try{
+    const [rp,rc]=await Promise.all([
+      fetch(SB_URL+'/rest/v1/preventivi?select=*&order=creato_il.desc',{headers:SB_H,cache:'no-cache'}),
+      fetch(SB_URL+'/rest/v1/consuntivi?select=preventivo_id',{headers:SB_H,cache:'no-cache'})
+    ]);
+    _PREVPICK=await rp.json(); if(!Array.isArray(_PREVPICK)) _PREVPICK=[];
+    const cons=await rc.json().catch(()=>[]);
+    _PREVPICK_DONE=new Set((Array.isArray(cons)?cons:[]).map(c=>String(c.preventivo_id)).filter(x=>x&&x!=='null'));
+  }catch(e){ _PREVPICK=[]; _PREVPICK_DONE=new Set(); toast('⚠ Errore caricamento preventivi'); }
+  const sa=document.getElementById('prevpick-soloappr'); if(sa) sa.checked=false;
+  const pc=document.getElementById('prevpick-cerca'); if(pc) pc.value='';
+  renderPrevPick();
+}
+function chiudiPickerPreventivo(){ const m=document.getElementById('m-prevpick'); if(m) m.style.display='none'; }
+function renderPrevPick(){
+  const box=document.getElementById('prevpick-lista'); if(!box) return;
+  const q=(document.getElementById('prevpick-cerca').value||'').toLowerCase();
+  const solo=document.getElementById('prevpick-soloappr').checked;
+  let lista=_PREVPICK.slice();
+  if(solo) lista=lista.filter(p=>_consApprov(p.stato));
+  if(q) lista=lista.filter(p=>((p.numero||'')+' '+(p.cliente_nome||'')+' '+(p.oggetto||'')+' '+(p.cantiere_ref||'')).toLowerCase().includes(q));
+  lista.sort((a,b)=>{ const aa=_consApprov(a.stato)?0:1, bb=_consApprov(b.stato)?0:1; if(aa!==bb) return aa-bb; return String(b.data||'').localeCompare(String(a.data||'')); });
+  if(!lista.length){ box.innerHTML='<div style="padding:16px;color:var(--text2);font-size:12px">Nessun preventivo trovato.</div>'; return; }
+  box.innerHTML=lista.map(p=>{
+    const dt=p.data?new Date(p.data).toLocaleDateString('it-IT'):'';
+    const done=_PREVPICK_DONE.has(String(p.id));
+    const badge=_consApprov(p.stato)?'<span style="font-size:10px;font-weight:700;color:#04222b;background:var(--green,#43c59e);border-radius:6px;padding:1px 6px">APPROVATO</span>':('<span style="font-size:10px;color:var(--text2,#8a94a6)">'+esc(p.stato||'bozza')+'</span>');
+    const badgeDone=done?' <span style="font-size:10px;color:var(--gold,#C9A227)">✓ già consuntivato</span>':'';
+    const cant=p.cantiere_ref?(' · 🏗 '+esc(p.cantiere_ref)):'';
+    return '<div onclick="scegliPrevConsuntivo('+p.id+')" style="cursor:pointer;padding:10px 12px;border-bottom:1px solid var(--brd,#24344d)">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b style="font-size:13px">'+esc(p.numero||'(senza numero)')+'</b><span class="mn" style="font-size:12px">'+eur(p.imponibile)+'</span></div>'+
+      '<div style="font-size:12px;color:var(--text2,#8a94a6)">'+esc(p.cliente_nome||'')+(p.oggetto?' — '+esc(p.oggetto):'')+'</div>'+
+      '<div style="font-size:10.5px;color:var(--text2,#8a94a6);margin-top:2px">'+esc(dt)+' · '+badge+cant+badgeDone+'</div>'+
+    '</div>';
+  }).join('');
+}
+async function scegliPrevConsuntivo(id){
+  let p=_PREVPICK.find(x=>String(x.id)===String(id));
+  if(!p){ try{ const r=await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+id+'&select=*',{headers:SB_H}); p=(await r.json())[0]; }catch(e){} }
+  if(!p){ toast('Preventivo non trovato'); return; }
+  chiudiPickerPreventivo();
+  await nuovoConsuntivoDaPreventivo(p);
 }
 
 init();
