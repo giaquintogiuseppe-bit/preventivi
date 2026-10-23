@@ -269,6 +269,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
     <button class="bs" onclick="vista('lista')">📁 Preventivi</button>
     <button class="bs" onclick="vista('consarchivio')">📊 Consuntivi</button>
     <button class="bs" onclick="vista('docarchivio')">🗂 Documenti</button>
+    <button class="bs" onclick="vista('modifiche')">🕘 Modifiche</button>
     <button class="btn" onclick="nuovoPreventivo()">+ Nuovo prev.</button>
   </div>
 
@@ -433,7 +434,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
 <div class="mo" id="m-prevpick" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:16px">
   <div style="background:var(--card);border:1px solid var(--brd);border-radius:var(--r);max-width:540px;width:100%;padding:20px;max-height:82vh;display:flex;flex-direction:column">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <h2 style="font-size:16px">📊 Nuovo consuntivo da preventivo</h2>
+      <h2 style="font-size:16px" id="prevpick-title">📊 Nuovo consuntivo da preventivo</h2>
       <button onclick="chiudiPickerPreventivo()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">✕</button>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Scegli il preventivo (o lavoro approvato) da cui partire: il consuntivo erediterà cliente, commessa e voci, da correggere con i valori reali.</p>
@@ -555,14 +556,20 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
         </select></div>
       <div><label>Numero</label><input id="d-numero" readonly style="opacity:.7"></div>
       <div><label>Data</label><input type="date" id="d-data"></div>
+      <div><label>Firma</label><select id="d-firmatario">
+        <option value="devcand">De Candiziis Ivo – Amm. Unico</option>
+        <option value="giuseppe">Giuseppe Giaquinto</option>
+      </select></div>
     </div>
   </div>
 
   <div class="card">
     <h2>🏛 Destinatario</h2>
-    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
       <select id="d-cli-select" onchange="selezionaClienteDoc()" style="flex:1;min-width:200px"><option value="">— Scegli dall'archivio o compila sotto —</option></select>
+      <button class="bs" onclick="apriPickerPreventivo('documento')">🔗 Collega a preventivo/commessa</button>
     </div>
+    <div id="d-link" style="display:none;font-size:12px;margin-bottom:10px;padding:6px 10px;border-radius:8px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.35);color:var(--gold,#C9A227)"></div>
     <div class="fg">
       <div class="full"><label>Denominazione / Ente</label><input id="d-dest" placeholder="Es. Comune di Cellole"></div>
       <div class="full"><label>Indirizzo</label><input id="d-dest-ind" placeholder="Via..., CAP Città (PR)"></div>
@@ -738,6 +745,27 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
   </div>
 </div>
 
+<!-- ══════════ ARCHIVIO MODIFICHE ══════════ -->
+<div id="v-modifiche" style="display:none">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2>🕘 Archivio modifiche</h2>
+      <button class="bs" onclick="caricaModifiche()">🔄</button>
+    </div>
+    <p style="font-size:12px;color:var(--text2);margin:8px 0 0">Registro automatico di creazioni, modifiche ed eliminazioni di preventivi, consuntivi e documenti.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0">
+      <input id="mod-cerca" placeholder="🔍 Cerca numero, descrizione..." oninput="renderModifiche()" style="flex:1;min-width:160px">
+      <select id="mod-filtro" onchange="renderModifiche()">
+        <option value="">Tutto</option>
+        <option value="preventivo">Preventivi</option>
+        <option value="consuntivo">Consuntivi</option>
+        <option value="documento">Documenti</option>
+      </select>
+    </div>
+    <div id="lista-mod"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -764,6 +792,7 @@ async function eliminaPreventivo(){
       try{
         await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,body:JSON.stringify({stato:'annullato',aggiornato_il:new Date().toISOString()})});
         toast('✓ Preventivo '+num+' segnato come annullato');
+        _logMod('preventivo',_editId,num,'modificato','segnato ANNULLATO',null);
         nuovoPreventivo();
       }catch(e){ toast('⚠ Errore'); }
     }
@@ -774,6 +803,7 @@ async function eliminaPreventivo(){
   try{
     await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'DELETE',headers:SB_H});
     toast('✓ Preventivo '+num+' eliminato');
+    _logMod('preventivo',_editId,num,'eliminato',null,null);
     nuovoPreventivo();
   }catch(e){ toast('⚠ Errore nella cancellazione'); }
 }
@@ -1146,12 +1176,13 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 function eur(n){return '€ '+parseFloat(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function vista(v){
-  const mappa={editor:'v-editor',lista:'v-lista',richieste:'v-richieste',documenti:'v-documenti',docarchivio:'v-docarchivio',consuntivo:'v-consuntivo',consarchivio:'v-consarchivio'};
+  const mappa={editor:'v-editor',lista:'v-lista',richieste:'v-richieste',documenti:'v-documenti',docarchivio:'v-docarchivio',consuntivo:'v-consuntivo',consarchivio:'v-consarchivio',modifiche:'v-modifiche'};
   Object.keys(mappa).forEach(k=>{const el=document.getElementById(mappa[k]); if(el) el.style.display=(v===k)?'block':'none';});
   if(v==='lista')caricaLista();
   if(v==='richieste')caricaRichieste();
   if(v==='docarchivio')caricaDocumenti();
   if(v==='consarchivio')caricaConsuntivi();
+  if(v==='modifiche')caricaModifiche();
   try{window.scrollTo(0,0);}catch(e){}
 }
 
@@ -1480,6 +1511,7 @@ function datiCorrenti(){
 async function salvaPreventivo(){
   const d=datiCorrenti();
   if(!d.cliente_nome){toast('Inserisci il cliente');return;}
+  const _wasNew=!_editId; const _oldImp=window._pAperto?(parseFloat(window._pAperto.imponibile)||0):null;
   try{
     // Il database può rifiutare il salvataggio (colonna mancante, sessione scaduta, numero doppio…):
     // controlla SEMPRE la risposta, non dire "salvato" se non lo è (i dati restano nel form).
@@ -1496,6 +1528,7 @@ async function salvaPreventivo(){
       _editId=row.id;
     }
     toast('✓ Preventivo '+d.numero+' salvato');
+    { const ni=parseFloat(d.imponibile)||0; const sint=_wasNew?('creato · imponibile '+eur(ni)):((_oldImp!=null&&Math.abs(ni-_oldImp)>=0.005)?('imponibile '+eur(_oldImp)+' → '+eur(ni)):'modificato'); _logMod('preventivo',_editId,d.numero,_wasNew?'creato':'modificato',sint,{imponibile:ni,totale:parseFloat(d.totale)||0,stato:_statoCorrente||d.stato||null}); }
     if(_prevDaRichiesta && _prevDaRichiesta.id){ try{ await fetch(SB_URL+'/rest/v1/richieste?id=eq.'+_prevDaRichiesta.id,{method:'PATCH',headers:SB_H,body:JSON.stringify({preventivo_numero:d.numero,stato:'preventivo'})}); }catch(e){} }
     // ora che è archiviato, mostra subito "Genera cantiere" e la vita del lavoro (prima serviva riaprirlo dall'archivio)
     if(_editId){
@@ -1617,7 +1650,7 @@ function _ciOver(p){ return p.flow.offsetHeight > p.main.clientHeight; }
 function _ciTop(doc,d){
   const el=doc.createElement('div'); el.className='top';
   const ind=(d.cliente_indirizzo||'').split(',').map(r=>r.trim()).filter(Boolean).map(r=>'<div>'+_ciEsc(r)+'</div>').join('');
-  el.innerHTML='<div class="meta"><div class="label">'+_ciEsc(_ciTipo(d))+' '+_ciEsc(d.numero||'')+'</div>'
+  el.innerHTML='<div class="meta"><div class="label">'+_ciEsc(d.docLabel||_ciTipo(d))+' '+_ciEsc(d.numero||'')+'</div>'
    +'<div class="date">Caserta, '+_ciEsc(_ciDataEstesa(d.data))+'</div>'
    +(d.rif_richiesta?'<div class="date">Rif. richiesta: '+_ciEsc(d.rif_richiesta)+'</div>':'')
    +'</div>'
@@ -1699,8 +1732,40 @@ function _ciFix(doc,dett,pages){
   }
   return pages;
 }
+// Documento di testo (lettera/proposta/certificato/dichiarazione): niente
+// tabella né totali; corpo a paragrafi, saluti e firma. Stessa carta intestata.
+function _ciTailDoc(doc,d){
+  const out=[];
+  if(d.saluti){ const p=doc.createElement('p'); p.innerHTML=_ciMline(d.saluti); out.push(p); }
+  const sign=doc.createElement('div'); sign.className='sign';
+  const chi=d.firmatario||'De Candiziis Ivo';
+  const ruolo=(d.qualifica!=null)?d.qualifica:'Amministratore Unico';
+  sign.innerHTML='<div class="co">Ottantunocento S.r.l.</div><div class="space"></div>'
+   +'<div class="who">'+_ciEsc(chi)+'</div>'+(ruolo?'<div class="role">'+_ciEsc(ruolo)+'</div>':'');
+  out.push(sign);
+  return out;
+}
+function _ciPaginateDoc(doc,d){
+  const pages=[];
+  let cur=_ciSheet(doc,false); pages.push(cur);
+  cur.flow.appendChild(_ciTop(doc,d));
+  if(d.oggetto){ const s=doc.createElement('div'); s.className='subject'; s.innerHTML='<div class="label">Oggetto</div><div class="txt">'+_ciEsc(d.oggetto)+'</div>'; cur.flow.appendChild(s); }
+  const blocks=(d.corpo||'').split(/\n[ \t]*\n/).map(s=>s.replace(/\s+$/,'')).filter(s=>s.trim().length);
+  blocks.forEach(b=>{
+    const p=doc.createElement('p'); p.innerHTML=_ciMline(b); cur.flow.appendChild(p);
+    if(_ciOver(cur) && cur.flow.children.length>1){ cur.flow.removeChild(p); cur=_ciSheet(doc,true); pages.push(cur); cur.flow.appendChild(p); }
+  });
+  const tail=_ciTailDoc(doc,d);
+  tail.forEach(el=>cur.flow.appendChild(el));
+  if(_ciOver(cur)){ tail.forEach(el=>el.remove()); cur=_ciSheet(doc,true); pages.push(cur); tail.forEach(el=>cur.flow.appendChild(el)); }
+  _ciFix(doc,false,pages);
+  const M=pages.length;
+  pages.forEach((p,i)=>{ const pg=p.footer.querySelector('.pg'); if(pg) pg.textContent = M>1?('Pag. '+(i+1)+' di '+M):''; });
+  return pages;
+}
 function _ciPaginate(doc,d){
   doc.body.innerHTML='';
+  if(d.tipoDoc==='testo'){ return _ciPaginateDoc(doc,d); }
   const dett = d.modalita==='dettagliata';
   let righe;
   if(dett){ righe=(d.righe||[]).map(v=>({desc:v.descrizione,qta:v.qta,prezzo:v.prezzo,imp:(parseFloat(v.qta)||0)*(parseFloat(v.prezzo)||0)})); }
@@ -1741,7 +1806,7 @@ function _ciPaginate(doc,d){
   return pages;
 }
 function _ciStampa(d){
-  const titolo=_ciTipo(d)+' '+(d.numero||'')+' — Ottantunocento S.r.l.';
+  const titolo=(d.docLabel||_ciTipo(d))+' '+(d.numero||'')+' — Ottantunocento S.r.l.';
   const head='<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>'+_ciEsc(titolo)+'</title>'
    +'<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">'
    +'<style>'+CI_CSS+'</style></head><body></body></html>';
@@ -2483,6 +2548,8 @@ async function nuovoDocumento(){
   document.getElementById('d-corpo').value=DOC_MODELLI.lettera(_docCtx());
   document.getElementById('d-oggetto').value=DOC_OGGETTI.lettera;
   document.getElementById('d-saluti').value=DOC_SALUTI.lettera;
+  const fs=document.getElementById('d-firmatario'); if(fs) fs.value='devcand';
+  _docLink=null; _docRenderLink();
 }
 
 function _docClientiOptions(){
@@ -2498,6 +2565,27 @@ function selezionaClienteDoc(){
   document.getElementById('d-dest-rif').value=c.riferimento||'';
 }
 
+let _docLink=null;   // {cantiere_id, cantiere_nome, preventivo_numero}
+function _docRenderLink(){
+  const box=document.getElementById('d-link'); if(!box) return;
+  const l=_docLink||{}; const parts=[];
+  if(l.preventivo_numero) parts.push('preventivo <b>'+esc(l.preventivo_numero)+'</b>');
+  if(l.cantiere_nome) parts.push('commessa <b>'+esc(l.cantiere_nome)+'</b>');
+  if(parts.length){ box.style.display='block'; box.innerHTML='🔗 Collegato a '+parts.join(' · ')+' <span onclick="_docScollega()" style="cursor:pointer;margin-left:8px;text-decoration:underline">rimuovi</span>'; }
+  else { box.style.display='none'; box.innerHTML=''; }
+}
+function _docScollega(){ _docLink=null; _docRenderLink(); }
+function _collegaDocAPreventivo(p){
+  _docLink={cantiere_id:p.cantiere_id||null, cantiere_nome:p.cantiere_nome||p.cantiere_ref||null, preventivo_numero:p.numero||null};
+  if(!_v('d-dest')){
+    document.getElementById('d-dest').value=p.cliente_nome||'';
+    document.getElementById('d-dest-ind').value=p.cliente_indirizzo||'';
+    document.getElementById('d-dest-piva').value=p.cliente_piva||'';
+    document.getElementById('d-dest-rif').value=p.cliente_riferimento||'';
+  }
+  _docRenderLink();
+  toast('Documento collegato a '+(p.numero||'')+(_docLink.cantiere_nome?' · '+_docLink.cantiere_nome:''));
+}
 function datiDocumento(){
   const tipo=_docTipoCorrente();
   return {
@@ -2506,7 +2594,9 @@ function datiDocumento(){
     destinatario_piva:_v('d-dest-piva')||null, destinatario_rif:_v('d-dest-rif')||null,
     oggetto:_v('d-oggetto')||null, corpo:document.getElementById('d-corpo').value,
     saluti:_v('d-saluti')||null, luogo:_v('d-luogo')||null,
-    extra:{evento:_v('d-evento'),struttura:_v('d-struttura'),dal:_v('d-dal')||null,al:_v('d-al')||null,tecnico:_v('d-tecnico')},
+    cantiere_id:(_docLink&&_docLink.cantiere_id)||null, cantiere_nome:(_docLink&&_docLink.cantiere_nome)||null,
+    extra:{evento:_v('d-evento'),struttura:_v('d-struttura'),dal:_v('d-dal')||null,al:_v('d-al')||null,tecnico:_v('d-tecnico'),
+      firmatario:_v('d-firmatario')||'devcand', preventivo_numero:(_docLink&&_docLink.preventivo_numero)||null},
     stato:'emesso'
   };
 }
@@ -2514,6 +2604,7 @@ function datiDocumento(){
 async function salvaDocumento(){
   const d=datiDocumento();
   if(!d.corpo.trim()){toast('⚠ Il documento è vuoto');return;}
+  const _wasNew=!_docEditId;
   try{
     if(_docEditId){
       const r=await fetch(SB_URL+'/rest/v1/documenti_aziendali?id=eq.'+_docEditId,{method:'PATCH',headers:SB_H,body:JSON.stringify(Object.assign({},d,{aggiornato_il:new Date().toISOString()}))});
@@ -2524,14 +2615,16 @@ async function salvaDocumento(){
       const row=(await r.json())[0]; if(row){_docEditId=row.id; document.getElementById('d-btn-elimina').style.display='inline-block';}
     }
     toast('✓ Documento salvato in archivio');
+    { const t=DOC_TIPI[d.tipo]||DOC_TIPI.lettera; _logMod('documento',_docEditId,d.numero,_wasNew?'creato':'modificato',(_wasNew?'creato · ':'modificato · ')+t.label+(d.destinatario_nome?' → '+d.destinatario_nome:''),{tipo:d.tipo,commessa:d.cantiere_nome||null,preventivo:(d.extra&&d.extra.preventivo_numero)||null}); }
   }catch(e){ toast('⚠ Errore salvataggio documento'); console.error(e); }
 }
 
 async function eliminaDocumento(){
   if(!_docEditId) return;
   if(!confirm('Eliminare definitivamente questo documento dall\'archivio?')) return;
+  const _num=_v('d-numero'), _id=_docEditId;
   try{ await fetch(SB_URL+'/rest/v1/documenti_aziendali?id=eq.'+_docEditId,{method:'DELETE',headers:SB_H});
-    toast('✓ Documento eliminato'); _docEditId=null; await caricaDocumenti(); vista('docarchivio');
+    toast('✓ Documento eliminato'); _logMod('documento',_id,_num,'eliminato',null,null); _docEditId=null; await caricaDocumenti(); vista('docarchivio');
   }catch(e){ toast('⚠ Errore eliminazione'); }
 }
 
@@ -2589,6 +2682,9 @@ async function apriDocumento(id){
   document.getElementById('d-dal').value=x.dal||'';
   document.getElementById('d-al').value=x.al||'';
   document.getElementById('d-tecnico').value=x.tecnico||'';
+  const fs=document.getElementById('d-firmatario'); if(fs) fs.value=x.firmatario||'devcand';
+  _docLink=(d.cantiere_id||d.cantiere_nome||x.preventivo_numero)?{cantiere_id:d.cantiere_id||null,cantiere_nome:d.cantiere_nome||null,preventivo_numero:x.preventivo_numero||null}:null;
+  _docRenderLink();
   document.getElementById('d-btn-elimina').style.display='inline-block';
 }
 
@@ -2603,75 +2699,27 @@ function generaPDFDoc(ritorna,mail){
   }
   return _pdfDocVero(ritorna,mail);
 }
-function _pdfDocVero(ritorna,mail){
+function _docPerCarta(){
   const d=datiDocumento();
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({unit:'mm',format:'a4'});
-  const W=210,M=18; let y=14;
-  const LIM=268;
-  const nuovaPagina=()=>{doc.addPage();y=16;};
-  const chk=(h)=>{ if(y+h>LIM){ nuovaPagina(); return true; } return false; };
-  // intestazione
-  try{doc.addImage(LOGO,'JPEG',M,y,W-2*M,(W-2*M)*125/700);y+=(W-2*M)*125/700+6;}catch(e){y+=10;}
-  doc.setDrawColor(200);doc.line(M,y,W-M,y);y+=8;
-  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(40);
-  doc.text('Caserta, '+_dataIt(d.data),W-M,y,{align:'right'});y+=8;
-  // destinatario (se presente)
-  if(d.destinatario_nome){
-    doc.setFont('helvetica','bold');doc.text('Spett.le '+d.destinatario_nome,W-M,y,{align:'right'});y+=5;
-    doc.setFont('helvetica','normal');doc.setFontSize(9.5);
-    if(d.destinatario_rif){doc.text('Alla c.a. '+d.destinatario_rif,W-M,y,{align:'right'});y+=4.5;}
-    (d.destinatario_indirizzo||'').split(',').forEach(r=>{if(r.trim()){doc.text(r.trim(),W-M,y,{align:'right'});y+=4.5;}});
-    if(d.destinatario_piva){doc.text('P.IVA '+d.destinatario_piva,W-M,y,{align:'right'});y+=4.5;}
-    y+=6;
-  } else { y+=4; }
-  // numero protocollo
-  doc.setFontSize(9);doc.setTextColor(110);
-  if(d.numero){doc.text('Prot. '+d.numero,M,y);y+=6;}
-  // oggetto
-  doc.setFontSize(10.5);doc.setTextColor(20);
-  if(d.oggetto){doc.setFont('helvetica','bold');const ol=doc.splitTextToSize('OGGETTO: '+d.oggetto,W-2*M);chk(ol.length*5+6);doc.text(ol,M,y);y+=ol.length*5+7;}
-  // corpo: paragrafi, righe MAIUSCOLE centrate in grassetto, elenco puntato rientrato
-  doc.setFontSize(10.5);doc.setFont('helvetica','normal');
-  (d.corpo||'').split('\n').forEach(riga=>{
-    const r=riga.trim();
-    if(!r){ y+=3.5; return; }
-    const soloMaiusc=/^[A-ZÀÈÉÌÒÙ0-9 .,'’\-]+$/.test(r) && r.length<60 && /[A-Z]/.test(r);
-    if(soloMaiusc){ chk(12); y+=2; doc.setFont('helvetica','bold'); doc.text(r,W/2,y,{align:'center'}); doc.setFont('helvetica','normal'); y+=8; return; }
-    const bullet=/^[•\-\*]\s?/.test(r);
-    const testo=bullet?('•  '+r.replace(/^[•\-\*]\s?/,'')):r;
-    const x=bullet?M+3:M;
-    const larg=(W-2*M)-(bullet?3:0);
-    const linee=doc.splitTextToSize(testo,larg);
-    linee.forEach(l=>{ chk(6); doc.text(l,x,y); y+=5.0; });
-    y+=bullet?0.6:2.0;
-  });
-  // formula di chiusura
-  if(d.saluti){ y+=3; const sl=doc.splitTextToSize(d.saluti,W-2*M); chk(sl.length*5+6); doc.text(sl,M,y); y+=sl.length*5+5; }
-  // firma (mai staccata a metà: se non ci sta tutta, va su pagina nuova)
-  const timbro=(d.tipo==='certificato'||d.tipo==='dichiarazione');
-  y+=3; if(y+(timbro?15:11)>274) nuovaPagina();
-  doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(20);doc.text('OTTANTUNOCENTO S.R.L.',W-M,y,{align:'right'});y+=5;
-  doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text('De Candiziis Ivo – Amministratore e legale rappresentante',W-M,y,{align:'right'});
-  if(timbro){ doc.setFontSize(7.5);doc.setTextColor(140);doc.text('timbro e firma',W-M-30,y+5.5,{align:'center'});
-    y+=13.5; doc.setDrawColor(170); doc.line(W-M-60,y,W-M,y); }
-  // piè di pagina identico ai preventivi
-  const nPag=doc.getNumberOfPages();
-  for(let p=1;p<=nPag;p++){
-    doc.setPage(p);
-    doc.setFontSize(7.5);doc.setTextColor(120);
-    doc.text('Ottantunocento S.r.l.  ·  Via Gemito 95 – 81100 Caserta (CE)',W/2,280,{align:'center'});
-    doc.text('IVA e Codice Fiscale: 02187720616  ·  sdi: W7YVJK9',W/2,283.8,{align:'center'});
-    doc.text('ottantunocentogroup@gmail.com  ·  Telefono: 0823 353336  ·  Pec: 81100@open.legalmail.it',W/2,287.6,{align:'center'});
-    if(nPag>1){ doc.text('Pag. '+p+' di '+nPag,W-M,287.6,{align:'right'}); }
-  }
-  const nomeFile=(d.numero||'Documento')+'_'+(d.destinatario_nome||d.luogo||'81100').replace(/[^a-zA-Z0-9]/g,'_').slice(0,30)+'.pdf';
-  if(ritorna) return {doc,nomeFile};
-  try{
-    _pdfPronto(doc.output('blob'),nomeFile,{titolo:(mail&&mail.titolo)||nomeFile.replace(/\.pdf$/,''),testo:mail&&mail.testo,mailto:mail&&mail.mailto});
-  }catch(e){ doc.save(nomeFile); toast('✓ PDF generato'); }
+  const t=DOC_TIPI[d.tipo]||DOC_TIPI.lettera;
+  const fmap={devcand:{chi:'De Candiziis Ivo',ruolo:'Amministratore Unico'},giuseppe:{chi:'Giuseppe Giaquinto',ruolo:''}};
+  const f=fmap[(d.extra&&d.extra.firmatario)||'devcand']||fmap.devcand;
+  return {tipoDoc:'testo', docLabel:t.label, numero:d.numero, data:d.data,
+    cliente_nome:d.destinatario_nome, cliente_indirizzo:d.destinatario_indirizzo,
+    cliente_piva:d.destinatario_piva, cliente_riferimento:d.destinatario_rif,
+    oggetto:d.oggetto, corpo:d.corpo, saluti:d.saluti, firmatario:f.chi, qualifica:f.ruolo};
 }
-
+async function _pdfDocVero(ritorna,mail){
+  const dd=_docPerCarta();
+  if(!dd.corpo||!dd.corpo.trim()){toast('\u26a0 Il documento \u00e8 vuoto');return;}
+  toast('\u23f3 Preparo il PDF\u2026');
+  let blob;
+  try{ blob=await _ciPdfBlob(dd); }
+  catch(e){ console.error('PDF documento',e); toast('\u26a0 PDF non creato: apro la stampa'); _ciStampa(dd); return; }
+  _pdfPronto(blob,_nomePdf(dd.numero||'Documento',dd.cliente_nome),{
+    titolo:(mail&&mail.titolo)||(dd.docLabel+' '+(dd.numero||'')),
+    testo:mail&&mail.testo, mailto:mail&&mail.mailto, stampa:()=>_ciStampa(dd)});
+}
 function inviaMailDoc(){
   const d=datiDocumento();
   const t=DOC_TIPI[d.tipo]||DOC_TIPI.lettera;
@@ -2690,6 +2738,7 @@ let C_VOCI=[];               // righe dell'editor consuntivo
 let C_MOD='dettagliata';
 let _consId=null;            // id (uuid) del consuntivo aperto, o null se nuovo
 let _consMeta={};            // {preventivo_id, preventivo_numero, cantiere_id, cantiere_nome}
+let _consOldImp=null;        // imponibile prima dell'ultima modifica (per l'archivio modifiche)
 
 function consFillClienti(){
   const sel=document.getElementById('c-cli-select'); if(!sel) return;
@@ -2789,7 +2838,7 @@ function _consResetEditor(){
   document.getElementById('c-btn-elimina').style.display='none';
 }
 async function nuovoConsuntivo(){
-  _consId=null; _consMeta={}; C_VOCI=[]; C_MOD='dettagliata';
+  _consId=null; _consMeta={}; _consOldImp=null; C_VOCI=[]; C_MOD='dettagliata';
   consFillClienti(); _consResetEditor();
   document.getElementById('c-intro').value='A conclusione delle attività, si trasmette il presente consuntivo dei lavori effettivamente eseguiti:';
   document.getElementById('c-note').value='Si resta a disposizione per ogni ulteriore chiarimento.';
@@ -2802,7 +2851,7 @@ function creaConsuntivoDaCorrente(){
 }
 async function nuovoConsuntivoDaPreventivo(p){
   if(!p){ toast('Preventivo non trovato'); return; }
-  _consId=null; C_VOCI=[]; C_MOD=p.modalita||'dettagliata';
+  _consId=null; _consOldImp=null; C_VOCI=[]; C_MOD=p.modalita||'dettagliata';
   _consMeta={ preventivo_id:p.id||null, preventivo_numero:p.numero||'', cantiere_id:p.cantiere_id||null, cantiere_nome:p.cantiere_nome||p.cantiere_ref||'' };
   consFillClienti(); _consResetEditor();
   document.getElementById('c-cliente').value=p.cliente_nome||'';
@@ -2828,6 +2877,7 @@ async function nuovoConsuntivoDaPreventivo(p){
 async function salvaConsuntivo(){
   const d=consDati();
   if(!d.cliente_nome){ toast('Inserisci il cliente'); return; }
+  const _wasNew=!_consId; const _oldImp=_consOldImp;
   const payload=Object.assign({}, d, {
     preventivo_id:_consMeta.preventivo_id||null,
     preventivo_numero:_consMeta.preventivo_numero||null,
@@ -2851,13 +2901,15 @@ async function salvaConsuntivo(){
       document.getElementById('c-btn-elimina').style.display='inline-block';
     }
     toast('✓ Consuntivo '+d.numero+' salvato');
+    { const ni=parseFloat(d.imponibile)||0; const sint=_wasNew?('creato · imponibile '+eur(ni)+(_consMeta.preventivo_numero?' · da '+_consMeta.preventivo_numero:'')):((_oldImp!=null&&Math.abs(ni-_oldImp)>=0.005)?('imponibile '+eur(_oldImp)+' → '+eur(ni)):'modificato'); _logMod('consuntivo',_consId,d.numero,_wasNew?'creato':'modificato',sint,{imponibile:ni,totale:parseFloat(d.totale)||0,preventivo:_consMeta.preventivo_numero||null,commessa:_consMeta.cantiere_nome||null}); _consOldImp=ni; }
   }catch(e){ const m=String((e&&e.message)||e); toast('⚠ NON salvato: '+m.slice(0,90)); console.error('salvaConsuntivo',e); }
 }
 async function eliminaConsuntivo(){
   if(!_consId){ toast('Consuntivo non ancora salvato'); return; }
   if(!confirm('Eliminare definitivamente questo consuntivo dall\'archivio?')) return;
+  const _num=document.getElementById('c-numero').value, _id=_consId;
   try{ await fetch(SB_URL+'/rest/v1/consuntivi?id=eq.'+_consId,{method:'DELETE',headers:SB_H});
-    toast('✓ Consuntivo eliminato'); _consId=null; await caricaConsuntivi(); vista('consarchivio');
+    toast('✓ Consuntivo eliminato'); _logMod('consuntivo',_id,_num,'eliminato',null,null); _consId=null; await caricaConsuntivi(); vista('consarchivio');
   }catch(e){ toast('⚠ Errore eliminazione'); }
 }
 function consGenPDF(){
@@ -2912,7 +2964,7 @@ async function apriConsuntivo(id){
   let c=CONS.find(x=>String(x.id)===String(id));
   if(!c){ try{ const r=await fetch(SB_URL+'/rest/v1/consuntivi?id=eq.'+id+'&select=*',{headers:SB_H}); c=(await r.json())[0]; }catch(e){} }
   if(!c){ toast('Consuntivo non trovato'); return; }
-  _consId=c.id;
+  _consId=c.id; _consOldImp=parseFloat(c.imponibile)||0;
   _consMeta={ preventivo_id:c.preventivo_id, preventivo_numero:c.preventivo_numero, cantiere_id:c.cantiere_id, cantiere_nome:c.cantiere_nome };
   C_MOD=c.modalita||'dettagliata';
   consFillClienti();
@@ -2942,8 +2994,12 @@ async function apriConsuntivo(id){
 // ── Selettore: nuovo consuntivo partendo da un preventivo / lavoro approvato ──
 let _PREVPICK=[];
 let _PREVPICK_DONE=new Set();
+let _prevPickMode='consuntivo';   // 'consuntivo' | 'documento'
 const _consApprov=s=>['accettato','approvato'].includes(String(s||'').toLowerCase());
-async function apriPickerPreventivo(){
+async function apriPickerPreventivo(mode){
+  _prevPickMode=mode||'consuntivo';
+  const tt=document.getElementById('prevpick-title');
+  if(tt) tt.textContent=(_prevPickMode==='documento')?'🔗 Collega documento a preventivo':'📊 Nuovo consuntivo da preventivo';
   const m=document.getElementById('m-prevpick'); if(m) m.style.display='flex';
   const box=document.getElementById('prevpick-lista'); if(box) box.innerHTML='<div style="padding:16px;color:var(--text2);font-size:12px">Caricamento…</div>';
   try{
@@ -2987,7 +3043,52 @@ async function scegliPrevConsuntivo(id){
   if(!p){ try{ const r=await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+id+'&select=*',{headers:SB_H}); p=(await r.json())[0]; }catch(e){} }
   if(!p){ toast('Preventivo non trovato'); return; }
   chiudiPickerPreventivo();
-  await nuovoConsuntivoDaPreventivo(p);
+  if(_prevPickMode==='documento'){ _collegaDocAPreventivo(p); }
+  else { await nuovoConsuntivoDaPreventivo(p); }
+}
+
+// ── ARCHIVIO MODIFICHE — log automatico su preventivi/consuntivi/documenti ──
+let MODS=[];
+async function _logMod(entita, entita_id, numero, azione, sintesi, dettaglio){
+  try{
+    await fetch(SB_URL+'/rest/v1/amm_modifiche',{method:'POST',headers:SB_H,body:JSON.stringify({
+      entita:entita, entita_id:entita_id!=null?String(entita_id):null, numero:numero||null,
+      azione:azione, sintesi:sintesi||null, dettaglio:dettaglio||null,
+      utente:(typeof MAIL_PERSONALE!=='undefined'?MAIL_PERSONALE:null)
+    })});
+  }catch(e){ /* non bloccante: il log non deve mai fermare il salvataggio */ }
+}
+async function caricaModifiche(){
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/amm_modifiche?select=*&order=creato_il.desc&limit=500',{headers:SB_H,cache:'no-cache'});
+    MODS=await r.json(); if(!Array.isArray(MODS)) MODS=[];
+  }catch(e){ MODS=[]; toast('⚠ Errore caricamento modifiche'); }
+  renderModifiche();
+}
+function renderModifiche(){
+  const box=document.getElementById('lista-mod'); if(!box) return;
+  const q=(document.getElementById('mod-cerca').value||'').toLowerCase();
+  const f=document.getElementById('mod-filtro').value||'';
+  const ic={preventivo:'📄',consuntivo:'📊',documento:'🗂'};
+  const colAz={creato:'#43c59e',modificato:'#C9A227',eliminato:'#e0795f'};
+  let lista=MODS.slice();
+  if(f) lista=lista.filter(m=>m.entita===f);
+  if(q) lista=lista.filter(m=>((m.numero||'')+' '+(m.sintesi||'')+' '+(m.entita||'')+' '+(m.azione||'')+' '+(m.utente||'')).toLowerCase().includes(q));
+  if(!lista.length){ box.innerHTML='<div class="muted" style="padding:18px;text-align:center">Nessuna modifica registrata.</div>'; return; }
+  box.innerHTML=lista.map(m=>{
+    const dt=m.creato_il?new Date(m.creato_il).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    const col=colAz[m.azione]||'var(--text2,#8a94a6)';
+    return '<div style="border:1px solid var(--brd);border-radius:10px;padding:9px 12px;margin-bottom:7px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+      '<span style="font-size:16px">'+(ic[m.entita]||'•')+'</span>'+
+      '<div style="flex:1;min-width:160px">'+
+        '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b style="font-size:13px">'+esc(m.numero||'—')+'</b>'+
+          '<span style="font-size:10px;font-weight:700;color:'+col+'">'+esc((m.azione||'').toUpperCase())+'</span>'+
+          '<span style="font-size:10px;color:var(--text2,#8a94a6)">'+esc(m.entita||'')+'</span></div>'+
+        (m.sintesi?'<div style="font-size:12px;color:var(--text2,#8a94a6)">'+esc(m.sintesi)+'</div>':'')+
+      '</div>'+
+      '<div style="text-align:right;font-size:10.5px;color:var(--text2,#8a94a6)">'+esc(dt)+(m.utente?'<br>'+esc(m.utente):'')+'</div>'+
+    '</div>';
+  }).join('');
 }
 
 init();
