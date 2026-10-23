@@ -667,6 +667,11 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
     <div class="fg">
       <div><label>Numero</label><input id="c-numero" readonly style="opacity:.7"></div>
       <div><label>Data</label><input type="date" id="c-data"></div>
+      <div><label>Stato</label><select id="c-stato">
+        <option value="bozza">Bozza</option>
+        <option value="definitivo">Definitivo</option>
+        <option value="inviato">Inviato</option>
+      </select></div>
       <div class="full"><label>Oggetto</label><textarea id="c-oggetto" rows="2" placeholder="Consuntivo dei lavori eseguiti – Evento ..."></textarea></div>
       <div class="full"><label>Introduzione</label><textarea id="c-intro" rows="2" placeholder="A conclusione dei lavori, si trasmette il presente consuntivo delle attività effettivamente svolte..."></textarea></div>
     </div>
@@ -715,6 +720,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
     <button class="btn" onclick="consGenPDF()">📄 Genera PDF</button>
     <button class="bs" onclick="salvaConsuntivo()">☁ Salva in archivio</button>
     <button class="bs" onclick="inviaMailConsuntivo()">✉ Invia via mail</button>
+    <button class="bs" id="c-btn-certifica" style="display:none;background:var(--teal,#0e6b64);color:#fff;border-color:var(--teal,#0e6b64)" onclick="certificaRicavoCommessa()" title="Rettifica il ricavo della commessa nel Gestionale con il valore reale di questo consuntivo">🔗 Certifica ricavo nella commessa</button>
     <div style="flex:1"></div>
     <button class="bd" id="c-btn-elimina" style="display:none" onclick="eliminaConsuntivo()">🗑 Elimina</button>
   </div>
@@ -987,6 +993,8 @@ async function _sincronizzaVoceCantiere(p){
     c.forniture=Array.isArray(c.forniture)?c.forniture:[];
     const giaVoce=c.forniture.find(v=>v.preventivoRef===numeroPrev);
     if(giaVoce){
+      // voce già certificata da consuntivo: il valore reale NON si tocca
+      if(giaVoce.consuntivato){ esito={ok:true,tipo:'consuntivato',nome:c.nome,importo:parseFloat(giaVoce.importo)||0}; return; }
       const delta=imp-parseFloat(giaVoce.importo||0);
       if(delta!==0){ giaVoce.importo=imp; if(b) b.ricavoPrevisto=Math.max(0,ricavoAtt+delta); }
       esito={ok:true,tipo:'update',nome:c.nome,importo:imp}; return;
@@ -995,6 +1003,8 @@ async function _sincronizzaVoceCantiere(p){
     // non va riaggiunto come integrativo, altrimenti raddoppia.
     const eBase=(c.preventivoRef===numeroPrev)||(c._daPreventivo===numeroPrev);
     if(eBase){
+      // ricavo della commessa già certificato da consuntivo: non si sovrascrive
+      if(b && b.consuntivato){ esito={ok:true,tipo:'consuntivato',nome:c.nome,importo:ricavoAtt}; return; }
       if(ricavoAtt<=0){ if(b) b.ricavoPrevisto=imp; else dati.budgetCantieri.push({cantiereId:c.id,cantiereName:c.nome,ricavoPrevisto:imp,note:'Da preventivo '+numeroPrev}); esito={ok:true,tipo:'base',nome:c.nome,importo:imp}; }
       else if(c.forniture.length===0 && ricavoAtt!==imp && b){ b.ricavoPrevisto=imp; esito={ok:true,tipo:'update',nome:c.nome,importo:imp}; } // base modificato, nessuna voce extra
       else esito={ok:true,tipo:'base',nome:c.nome,importo:ricavoAtt}; // idempotente
@@ -2810,8 +2820,14 @@ function consDati(){
     elenco_materiali:C_MOD==='corpo'?document.getElementById('c-materiali').value.split('\n').map(s=>s.trim()).filter(Boolean):[],
     righe:C_MOD==='dettagliata'?C_VOCI.map(v=>({descrizione:v.desc,qta:v.qta,prezzo:v.prezzo})):[{descrizione:document.getElementById('c-corpo-desc').value,qta:1,prezzo:parseFloat(document.getElementById('c-corpo-imp').value||0)}],
     imponibile:c.imp, iva_tipo:c.tipo, iva_perc:c.perc, iva_importo:c.iva, totale:c.tot, a_carico_cliente:c.aCarico,
-    note_finali:document.getElementById('c-note').value
+    note_finali:document.getElementById('c-note').value,
+    stato:(document.getElementById('c-stato')&&document.getElementById('c-stato').value)||'bozza'
   };
+}
+// mostra "Certifica ricavo" solo se il consuntivo è salvato e legato a una commessa
+function _consAggiornaCertifica(){
+  const b=document.getElementById('c-btn-certifica'); if(!b) return;
+  b.style.display=(_consId && _consMeta && _consMeta.cantiere_id)?'inline-block':'none';
 }
 function consRenderLink(){
   const box=document.getElementById('cons-link'); if(!box) return;
@@ -2820,6 +2836,7 @@ function consRenderLink(){
   if(m.cantiere_nome) parts.push('commessa <b>'+esc(m.cantiere_nome)+'</b>');
   if(parts.length){ box.style.display='block'; box.innerHTML='🔗 Collegato '+parts.join(' · '); }
   else { box.style.display='none'; box.innerHTML=''; }
+  _consAggiornaCertifica();
 }
 async function consProssimoNumero(){
   const anno=new Date().getFullYear();
@@ -2834,6 +2851,7 @@ function _consResetEditor(){
   document.getElementById('c-cli-select').value='';
   ['c-cliente','c-cliente-ind','c-cliente-piva','c-cliente-rif','c-oggetto','c-intro','c-materiali','c-corpo-desc','c-corpo-imp','c-note'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
   document.getElementById('c-iva-tipo').value='normale'; document.getElementById('c-iva-perc').value=22;
+  const cs=document.getElementById('c-stato'); if(cs) cs.value='bozza';
   document.getElementById('c-data').value=new Date().toISOString().slice(0,10);
   document.getElementById('c-btn-elimina').style.display='none';
 }
@@ -2902,6 +2920,7 @@ async function salvaConsuntivo(){
     }
     toast('✓ Consuntivo '+d.numero+' salvato');
     { const ni=parseFloat(d.imponibile)||0; const sint=_wasNew?('creato · imponibile '+eur(ni)+(_consMeta.preventivo_numero?' · da '+_consMeta.preventivo_numero:'')):((_oldImp!=null&&Math.abs(ni-_oldImp)>=0.005)?('imponibile '+eur(_oldImp)+' → '+eur(ni)):'modificato'); _logMod('consuntivo',_consId,d.numero,_wasNew?'creato':'modificato',sint,{imponibile:ni,totale:parseFloat(d.totale)||0,preventivo:_consMeta.preventivo_numero||null,commessa:_consMeta.cantiere_nome||null}); _consOldImp=ni; }
+    _consAggiornaCertifica();
   }catch(e){ const m=String((e&&e.message)||e); toast('⚠ NON salvato: '+m.slice(0,90)); console.error('salvaConsuntivo',e); }
 }
 async function eliminaConsuntivo(){
@@ -2980,6 +2999,7 @@ async function apriConsuntivo(id){
   document.getElementById('c-note').value=c.note_finali||'';
   document.getElementById('c-iva-tipo').value=c.iva_tipo||'normale';
   document.getElementById('c-iva-perc').value=c.iva_perc||22;
+  const cs=document.getElementById('c-stato'); if(cs) cs.value=c.stato||'bozza';
   if(C_MOD==='corpo'){
     document.getElementById('c-materiali').value=(c.elenco_materiali||[]).join('\n');
     document.getElementById('c-corpo-desc').value=(c.righe&&c.righe[0]&&c.righe[0].descrizione)||'';
@@ -3045,6 +3065,66 @@ async function scegliPrevConsuntivo(id){
   chiudiPickerPreventivo();
   if(_prevPickMode==='documento'){ _collegaDocAPreventivo(p); }
   else { await nuovoConsuntivoDaPreventivo(p); }
+}
+
+// ── CERTIFICA RICAVO: il consuntivo rettifica il ricavo della commessa ──
+// Regola: tocca SOLO la quota del preventivo collegato (per voce, altrimenti il
+// ricavo unico della commessa). Anteprima + conferma obbligatoria. Marca
+// "consuntivato" così l'Aggiorna commessa del preventivo non lo sovrascrive più.
+async function certificaRicavoCommessa(){
+  if(!_consId){ toast('Salva prima il consuntivo'); return; }
+  const cantId=_consMeta&&_consMeta.cantiere_id;
+  if(!cantId){ toast('⚠ Nessuna commessa collegata a questo consuntivo'); return; }
+  const d=consDati();
+  const impCons=parseFloat(d.imponibile)||0;
+  const prevNum=_consMeta.preventivo_numero||null;
+  let cantNome='', ricavoAtt=0, voceImp=null, haVoce=false;
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/gestionale_dati?id=eq.unico&select=dati',{headers:SB_H,cache:'no-cache'});
+    let dati=(await r.json())[0]; dati=dati&&dati.dati; if(typeof dati==='string') dati=JSON.parse(dati);
+    const c=(dati.cantieri||[]).find(x=>x.id===cantId);
+    if(!c){ toast('⚠ Commessa non trovata nel gestionale'); return; }
+    cantNome=c.nome||'';
+    const b=(dati.budgetCantieri||[]).find(x=>x.cantiereId===cantId);
+    ricavoAtt=b?(parseFloat(b.ricavoPrevisto)||0):0;
+    const vv=prevNum?((c.forniture||[]).find(v=>v.preventivoRef===prevNum)):null;
+    if(vv){ haVoce=true; voceImp=parseFloat(vv.importo)||0; }
+  }catch(e){ toast('⚠ Gestionale non leggibile'); return; }
+  const nuovoRicavo = haVoce ? Math.max(0, ricavoAtt + (impCons - voceImp)) : impCons;
+  const testo = haVoce
+    ? ('Voce «'+(prevNum||'')+'»: '+eur(voceImp)+' → '+eur(impCons)+'\nRicavo commessa: '+eur(ricavoAtt)+' → '+eur(nuovoRicavo))
+    : ('Ricavo commessa: '+eur(ricavoAtt)+' → '+eur(impCons));
+  if(!confirm('Certifica il ricavo della commessa «'+cantNome+'» con il consuntivo '+(d.numero||'')+'.\n\n'+testo+'\n\nGli altri valori della commessa NON vengono toccati.\nProcedere?')) return;
+  let finale;
+  try{
+    finale=await _blobPatchSicuro(dati=>{
+      const c=(dati.cantieri||[]).find(x=>x.id===cantId); if(!c) throw new Error('commessa non trovata');
+      dati.budgetCantieri=dati.budgetCantieri||[];
+      let b=dati.budgetCantieri.find(x=>x.cantiereId===cantId);
+      c.forniture=Array.isArray(c.forniture)?c.forniture:[];
+      const vv=prevNum?c.forniture.find(v=>v.preventivoRef===prevNum):null;
+      let nr;
+      if(vv){
+        const old=parseFloat(vv.importo)||0;
+        vv.importo=impCons; vv.consuntivato=true; vv.consuntivo_numero=d.numero; vv.fonte='consuntivo';
+        if(b){ b.ricavoPrevisto=Math.max(0,(parseFloat(b.ricavoPrevisto)||0)+(impCons-old)); nr=b.ricavoPrevisto; }
+        else { dati.budgetCantieri.push({cantiereId:cantId,cantiereName:c.nome,ricavoPrevisto:impCons,note:'Consuntivo '+d.numero}); nr=impCons; }
+      } else {
+        if(b){ b.ricavoPrevisto=impCons; b.consuntivato=true; b.consuntivo_numero=d.numero; b.note=(b.note?b.note+' · ':'')+'ricavo certificato da consuntivo '+d.numero; }
+        else { dati.budgetCantieri.push({cantiereId:cantId,cantiereName:c.nome,ricavoPrevisto:impCons,consuntivato:true,consuntivo_numero:d.numero,note:'Ricavo certificato da consuntivo '+d.numero}); }
+        nr=impCons;
+      }
+      c.consuntivato=true; c.consuntivo_numero=d.numero;
+      return nr;
+    });
+  }catch(e){ toast('⚠ Certificazione non riuscita: '+String(e.message||e).slice(0,70)); return; }
+  _logMod('consuntivo',_consId,d.numero,'modificato','ricavo commessa «'+cantNome+'» certificato → '+eur(finale),{cantiere_id:cantId,ricavo:finale});
+  try{
+    const cs=document.getElementById('c-stato'); const patch={aggiornato_il:new Date().toISOString()};
+    if(cs && cs.value==='bozza'){ patch.stato='definitivo'; cs.value='definitivo'; }
+    await fetch(SB_URL+'/rest/v1/consuntivi?id=eq.'+_consId,{method:'PATCH',headers:SB_H,body:JSON.stringify(patch)});
+  }catch(e){}
+  toast('✓ Ricavo della commessa «'+cantNome+'» certificato → '+eur(finale));
 }
 
 // ── ARCHIVIO MODIFICHE — log automatico su preventivi/consuntivi/documenti ──
