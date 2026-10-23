@@ -1,4 +1,4 @@
-const CACHE_NAME = 'otto8100-amministrazione-v15';
+const CACHE_NAME = 'otto8100-amministrazione-v16';
 
 self.addEventListener('install', e => {
   e.waitUntil(

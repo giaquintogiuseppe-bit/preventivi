@@ -2931,19 +2931,27 @@ async function eliminaConsuntivo(){
     toast('✓ Consuntivo eliminato'); _logMod('consuntivo',_id,_num,'eliminato',null,null); _consId=null; await caricaConsuntivi(); vista('consarchivio');
   }catch(e){ toast('⚠ Errore eliminazione'); }
 }
-function consGenPDF(){
+// PDF del consuntivo: stesso flusso robusto del preventivo (file PDF condivisibile
+// via menu di sistema), senza window.open/print né mailto che su iPhone (PWA)
+// navigano via dall'app e fanno abortire il salvataggio.
+async function consGenPDF(mail){
   const d=consDati();
   if(!d.cliente_nome){ toast('Inserisci il cliente'); return; }
-  if(typeof _ciStampa==='function'){ _ciStampa(d); }
-  else { toast('Modulo PDF non disponibile'); }
+  toast('⏳ Preparo il PDF…');
+  let blob;
+  try{ blob=await _ciPdfBlob(d); }
+  catch(e){ console.error('PDF consuntivo',e); toast('⚠ PDF non creato: apro la stampa'); if(typeof _ciStampa==='function') _ciStampa(d); return; }
+  _pdfPronto(blob,_nomePdf(d.numero||'Consuntivo',d.cliente_nome),{
+    titolo:(mail&&mail.titolo)||(_ciTipo(d)+' '+(d.numero||'')),
+    testo:mail&&mail.testo, mailto:mail&&mail.mailto, stampa:()=>_ciStampa(d)
+  });
 }
 function inviaMailConsuntivo(){
   const d=consDati();
   if(!d.cliente_nome){ toast('Inserisci il cliente'); return; }
-  const ogg=encodeURIComponent((d.numero||'Consuntivo')+(d.oggetto?' – '+d.oggetto:''));
-  const corpo=encodeURIComponent('Spett.le '+d.cliente_nome+',\n\nin allegato il consuntivo '+(d.numero||'')+' dei lavori eseguiti'+(d.oggetto?' relativo a: '+d.oggetto:'')+'.\n\nTotale: '+eur(d.totale)+'.\n\nCordiali saluti.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
-  window.location.href='mailto:?subject='+ogg+'&body='+corpo;
-  toast('Allega il PDF generato prima di inviare');
+  const ogg=(d.numero||'Consuntivo')+(d.oggetto?' – '+d.oggetto:'');
+  const corpo=('Spett.le '+d.cliente_nome+',\n\nin allegato il consuntivo '+(d.numero||'')+' dei lavori eseguiti'+(d.oggetto?' relativo a: '+d.oggetto:'')+'.\n\nTotale: '+eur(d.totale)+'.\n\nCordiali saluti.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
+  consGenPDF({titolo:ogg,testo:corpo,mailto:'mailto:?subject='+encodeURIComponent(ogg)+'&body='+encodeURIComponent(corpo)});
 }
 async function caricaConsuntivi(){
   consFillClienti();
