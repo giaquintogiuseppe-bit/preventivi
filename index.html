@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
 <link rel="manifest" href="manifest.json?v=2">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1632,36 +1633,116 @@ function _ciStampa(d){
   toast('✓ Documento su carta intestata pronto — usa Stampa → Salva come PDF');
 }
 
+// ===== PDF CONDIVISIBILE =====
+// Sull'iPhone l'app aggiunta alla Home non ha la barra di Safari: la Stampa e il PDF
+// aperto in una nuova scheda non offrono "Condividi". Qui il PDF diventa un file vero
+// e si condivide col menu di sistema (Mail, WhatsApp, File…) via navigator.share.
+// La Stampa resta disponibile per la versione a qualità tipografica.
+const _attesa=(pr,ms)=>Promise.race([pr,new Promise(r=>setTimeout(r,ms))]).catch(()=>{});
+async function _ciPdfBlob(d){
+  if(typeof html2canvas!=='function') throw new Error('libreria html2canvas non caricata');
+  const ifr=document.createElement('iframe'); ifr.setAttribute('aria-hidden','true');
+  ifr.style.cssText='position:fixed;left:-10000px;top:0;width:900px;height:1300px;border:0;';
+  document.body.appendChild(ifr);
+  try{
+    const doc=ifr.contentDocument;
+    doc.open();
+    doc.write('<!DOCTYPE html><html lang="it"><head><meta charset="utf-8">'
+     +'<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">'
+     +'<style>'+CI_CSS+'</style></head><body></body></html>');
+    doc.close();
+    // font caricati PRIMA di impaginare: le misure delle pagine dipendono dal font
+    if(doc.fonts) await _attesa(Promise.all(['400','600','700','800'].map(w=>doc.fonts.load(w+' 12px "Hanken Grotesk"'))),4000);
+    const pages=_ciPaginate(doc,d);
+    if(doc.fonts) await _attesa(doc.fonts.ready,3000);
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({unit:'mm',format:'a4',compress:true});
+    for(let i=0;i<pages.length;i++){
+      const sh=pages[i].sheet; sh.style.margin='0'; sh.style.boxShadow='none';
+      const cv=await html2canvas(sh,{scale:2,backgroundColor:'#ffffff',logging:false});
+      if(i) pdf.addPage();
+      pdf.addImage(cv.toDataURL('image/jpeg',0.9),'JPEG',0,0,210,297);
+    }
+    return pdf.output('blob');
+  } finally { ifr.remove(); }
+}
+function _nomePdf(numero,chi){ return (numero||'Documento')+'_'+String(chi||'81100').replace(/[^a-zA-Z0-9]/g,'_').slice(0,30)+'.pdf'; }
+// Finestra "PDF pronto": la condivisione parte da un tocco qui (il sistema la consente
+// solo dopo un gesto dell'utente, non al termine di un'attesa).
+// o = { titolo, testo, mailto, stampa }
+function _pdfPronto(blob,nomeFile,o){
+  o=o||{};
+  const file=new File([blob],nomeFile,{type:'application/pdf'});
+  const puoCondividere=!!(navigator.canShare&&navigator.canShare({files:[file]}));
+  let m=document.getElementById('m-pdf'); if(m) m.remove();
+  m=document.createElement('div'); m.id='m-pdf'; m.className='mo';
+  m.style.cssText='display:flex;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;align-items:center;justify-content:center;padding:16px';
+  const riga='width:100%;margin-bottom:8px;padding:13px;font-size:14px';
+  m.innerHTML='<div style="background:var(--card);border:1px solid var(--brd);border-radius:var(--r);max-width:420px;width:100%;padding:20px">'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><h2 style="font-size:16px">📄 PDF pronto</h2>'
+   +'<button id="pdf-x" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer">✕</button></div>'
+   +'<p style="font-size:12px;color:var(--text2);margin-bottom:14px;word-break:break-all">'+_ciEsc(nomeFile)+' · '+Math.max(1,Math.round(blob.size/1024))+' KB</p>'
+   +(puoCondividere?'<button class="btn" id="pdf-share" style="'+riga+'">📤 Condividi — Mail, WhatsApp, File…</button>':'')
+   +'<button class="bs" id="pdf-open" style="'+riga+'">⬇ Apri / Scarica il PDF</button>'
+   +(o.mailto?'<button class="bs" id="pdf-mailto" style="'+riga+'">✉ Apri la mail (allega il PDF a mano)</button>':'')
+   +(o.stampa?'<button class="bs" id="pdf-print" style="'+riga+'">🖨 Stampa (qualità tipografica)</button>':'')
+   +'</div>';
+  document.body.appendChild(m);
+  const chiudi=()=>m.remove();
+  m.querySelector('#pdf-x').onclick=chiudi;
+  m.addEventListener('click',e=>{ if(e.target===m) chiudi(); });
+  const sh=m.querySelector('#pdf-share');
+  if(sh) sh.onclick=()=>{
+    const dati={files:[file],title:o.titolo||nomeFile};
+    if(o.testo) dati.text=o.testo;
+    navigator.share(dati).then(chiudi).catch(e=>{ if(!e||e.name!=='AbortError') toast('⚠ Condivisione non riuscita: '+((e&&e.message)||e)); });
+  };
+  m.querySelector('#pdf-open').onclick=()=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=nomeFile; a.rel='noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  };
+  const mt=m.querySelector('#pdf-mailto');
+  if(mt) mt.onclick=()=>{ window.location.href=o.mailto; };
+  const pr=m.querySelector('#pdf-print');
+  if(pr) pr.onclick=()=>{ chiudi(); o.stampa(); };
+}
+
 // ===== CARTA INTESTATA — fine =====
-function generaPDF(ritorna){
+// mail = { titolo, testo, mailto } quando il PDF serve per inviarlo
+function generaPDF(ritorna,mail){
   const d=datiCorrenti();
   if(!d.cliente_nome){toast('Inserisci il cliente');return;}
   // promemoria archivio: se non è ancora salvato su Supabase, lo ricorda
   if(!ritorna && !_editId){
     if(confirm('Questo preventivo non è ancora in archivio.\n\nOK = archivia ora e genera il PDF (consigliato: così lo ritrovi da ogni dispositivo)\nAnnulla = genera solo il PDF')){
-      salvaPreventivo().then(()=>_generaPDFvero(false));
+      salvaPreventivo().then(()=>_generaPDFvero(false,mail));
       return;
     }
   }
-  return _generaPDFvero(ritorna);
+  return _generaPDFvero(ritorna,mail);
 }
-function _generaPDFvero(ritorna){
+async function _generaPDFvero(ritorna,mail){
   const d=datiCorrenti();
   if(!d.cliente_nome){toast('Inserisci il cliente');return;}
-  // Carta intestata ufficiale (template HTML A4) — Stampa del browser → Salva come PDF.
-  _ciStampa(d);
+  // Carta intestata ufficiale (template HTML A4) → file PDF da condividere.
+  toast('⏳ Preparo il PDF…');
+  let blob;
+  try{ blob=await _ciPdfBlob(d); }
+  catch(e){ console.error('PDF carta intestata',e); toast('⚠ PDF non creato: apro la stampa'); _ciStampa(d); return; }
+  _pdfPronto(blob,_nomePdf(d.numero||'Preventivo',d.cliente_nome),{
+    titolo:(mail&&mail.titolo)||(_ciTipo(d)+' '+(d.numero||'')),
+    testo:mail&&mail.testo, mailto:mail&&mail.mailto, stampa:()=>_ciStampa(d)
+  });
 }
 function inviaMail(){
   const d=datiCorrenti();
   if(!d.cliente_nome){toast('Inserisci il cliente');return;}
-  const ogg=encodeURIComponent((d.numero||'Preventivo')+' – '+(d.oggetto||'Ottantunocento'));
-  const corpo=encodeURIComponent('Spett.le '+d.cliente_nome+',\n\nin allegato il preventivo '+d.numero+' relativo a: '+(d.oggetto||'')+'.\n\nTotale: '+eur(d.totale)+(d.iva_tipo==='split'?(' (IVA a carico Ente, art.17-ter — a Vs. carico '+eur(d.a_carico_cliente!=null?d.a_carico_cliente:d.imponibile)+')'):((d.iva_tipo==='esente'||d.iva_tipo==='ni'||d.iva_tipo==='art7quater')?' (IVA non applicata)':' IVA inclusa'))+'.\nValidità: '+d.validita+'.\n\nRestiamo a disposizione.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
-  const scelta=confirm('OK = invia dalla mail AZIENDALE ('+MAIL_AZIENDALE+')\nAnnulla = invia dalla mail PERSONALE ('+MAIL_PERSONALE+')');
-  const from=scelta?MAIL_AZIENDALE:MAIL_PERSONALE;
-  // genera anche il PDF da allegare (l'utente lo allega manualmente)
-  generaPDF();
-  window.location.href='mailto:?subject='+ogg+'&body='+corpo;
-  toast('Client mail aperto — allega il PDF appena scaricato');
+  const ogg=(d.numero||'Preventivo')+' – '+(d.oggetto||'Ottantunocento');
+  const corpo=('Spett.le '+d.cliente_nome+',\n\nin allegato il preventivo '+d.numero+' relativo a: '+(d.oggetto||'')+'.\n\nTotale: '+eur(d.totale)+(d.iva_tipo==='split'?(' (IVA a carico Ente, art.17-ter — a Vs. carico '+eur(d.a_carico_cliente!=null?d.a_carico_cliente:d.imponibile)+')'):((d.iva_tipo==='esente'||d.iva_tipo==='ni'||d.iva_tipo==='art7quater')?' (IVA non applicata)':' IVA inclusa'))+'.\nValidità: '+d.validita+'.\n\nRestiamo a disposizione.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
+  // PDF + testo della mail insieme: dal menu Condividi si sceglie Mail (o WhatsApp) e il PDF è già allegato
+  generaPDF(false,{titolo:ogg,testo:corpo,mailto:'mailto:?subject='+encodeURIComponent(ogg)+'&body='+encodeURIComponent(corpo)});
 }
 
 // ── ARCHIVIO ──
@@ -2382,17 +2463,17 @@ async function apriDocumento(id){
 }
 
 /* ── PDF su carta intestata (stesso modello dei preventivi) ── */
-function generaPDFDoc(ritorna){
+function generaPDFDoc(ritorna,mail){
   const d=datiDocumento();
   if(!d.corpo.trim()){toast('⚠ Il documento è vuoto');return;}
   if(!ritorna && !_docEditId){
     if(confirm('Questo documento non è ancora in archivio.\n\nOK = archivialo ora e genera il PDF (consigliato)\nAnnulla = genera solo il PDF')){
-      salvaDocumento().then(()=>_pdfDocVero(false)); return;
+      salvaDocumento().then(()=>_pdfDocVero(false,mail)); return;
     }
   }
-  return _pdfDocVero(ritorna);
+  return _pdfDocVero(ritorna,mail);
 }
-function _pdfDocVero(ritorna){
+function _pdfDocVero(ritorna,mail){
   const d=datiDocumento();
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'});
@@ -2457,19 +2538,17 @@ function _pdfDocVero(ritorna){
   const nomeFile=(d.numero||'Documento')+'_'+(d.destinatario_nome||d.luogo||'81100').replace(/[^a-zA-Z0-9]/g,'_').slice(0,30)+'.pdf';
   if(ritorna) return {doc,nomeFile};
   try{
-    const blob=doc.output('blob'); const url=URL.createObjectURL(blob);
-    const w=window.open(url,'_blank'); if(!w){ doc.save(nomeFile); }
-    toast('✓ PDF aperto in una nuova scheda');
+    _pdfPronto(doc.output('blob'),nomeFile,{titolo:(mail&&mail.titolo)||nomeFile.replace(/\.pdf$/,''),testo:mail&&mail.testo,mailto:mail&&mail.mailto});
   }catch(e){ doc.save(nomeFile); toast('✓ PDF generato'); }
 }
 
 function inviaMailDoc(){
   const d=datiDocumento();
   const t=DOC_TIPI[d.tipo]||DOC_TIPI.lettera;
-  const ogg=encodeURIComponent((d.numero||t.label)+(d.oggetto?' – '+d.oggetto:''));
-  const corpo=encodeURIComponent('Spett.le '+(d.destinatario_nome||'')+',\n\nin allegato '+t.label.toLowerCase()+' '+(d.numero||'')+(d.oggetto?' relativa a: '+d.oggetto:'')+'.\n\nCordiali saluti.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
-  window.location.href='mailto:?subject='+ogg+'&body='+corpo;
-  toast('Allega il PDF generato prima di inviare');
+  const ogg=(d.numero||t.label)+(d.oggetto?' – '+d.oggetto:'');
+  const corpo=('Spett.le '+(d.destinatario_nome||'')+',\n\nin allegato '+t.label.toLowerCase()+' '+(d.numero||'')+(d.oggetto?' relativa a: '+d.oggetto:'')+'.\n\nCordiali saluti.\n\nOTTANTUNOCENTO S.R.L.\nDe Candiziis Ivo – Amministratore\nVia Gemito 95 – 81100 Caserta (CE)\nTel. 0823 353336');
+  if(!d.corpo.trim()){toast('⚠ Il documento è vuoto');return;}
+  generaPDFDoc(false,{titolo:ogg,testo:corpo,mailto:'mailto:?subject='+encodeURIComponent(ogg)+'&body='+encodeURIComponent(corpo)});
 }
 
 init();
