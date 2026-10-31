@@ -682,6 +682,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
         <option value="bozza">Bozza</option>
         <option value="definitivo">Definitivo</option>
         <option value="inviato">Inviato</option>
+        <option value="fatturato">Fatturato</option>
       </select></div>
       <div class="full"><label>Oggetto</label><textarea id="c-oggetto" rows="2" placeholder="Consuntivo dei lavori eseguiti – Evento ..."></textarea></div>
       <div class="full"><label>Introduzione</label><textarea id="c-intro" rows="2" placeholder="A conclusione dei lavori, si trasmette il presente consuntivo delle attività effettivamente svolte..."></textarea></div>
@@ -1212,6 +1213,7 @@ function vista(v){
 // REFERENTI (Rapporti) — scheda per referente: società, preventivi, fatturato
 // ═══════════════════════════════════════════════════════════
 let _refFatt=null;   // cache fatture (con importo) per i totali per referente
+let _refCons=[];     // consuntivi definitivi/inviati = da fatturare
 function _refEur(n){ return '€ '+(Number(n)||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function _refAccSum(f){ return Array.isArray(f.acconti)?f.acconti.reduce((s,a)=>s+(+a.importo||0),0):0; }
 async function caricaReferenti(){
@@ -1220,6 +1222,7 @@ async function caricaReferenti(){
   try{ if(!REFPREV||!Object.keys(REFPREV).length) await _caricaReferentiPrev(); }catch(e){}
   try{ if(!LISTA||!LISTA.length){ const r=await fetch(SB_URL+'/rest/v1/preventivi?select=*&order=creato_il.desc',{headers:SB_H,cache:'no-cache'}); LISTA=await r.json(); if(!Array.isArray(LISTA))LISTA=[]; } }catch(e){}
   try{ const r=await fetch(SB_URL+'/rest/v1/fatture?select=numero,cliente,importo,stato,data_pagamento,acconti',{headers:SB_H,cache:'no-cache'}); _refFatt=await r.json(); if(!Array.isArray(_refFatt))_refFatt=[]; }catch(e){ _refFatt=[]; }
+  try{ const r=await fetch(SB_URL+'/rest/v1/consuntivi?select=id,numero,data,cliente_nome,cantiere_nome,oggetto,imponibile,stato&stato=in.(definitivo,inviato)&order=data.desc',{headers:SB_H,cache:'no-cache'}); _refCons=await r.json(); if(!Array.isArray(_refCons))_refCons=[]; }catch(e){ _refCons=[]; }
   renderReferenti();
 }
 function renderReferenti(){
@@ -1241,6 +1244,8 @@ function renderReferenti(){
     const fatturato=fatt.reduce((s,f)=>s+(+f.importo||0),0);
     const incassato=fatt.reduce((s,f)=>s+((f.stato==='pagata')?(+f.importo||0):_refAccSum(f)),0);
     const daInc=Math.max(0,fatturato-incassato);
+    const cons=(_refCons||[]).filter(c=>match(c.cliente_nome));
+    const daFatt=cons.reduce((s,c)=>s+(+c.imponibile||0),0);
     html+='<div class="card" style="margin-bottom:10px">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">'+
         '<h2 style="margin:0">👤 '+esc(nome)+' <span class="sub" style="font-weight:400">· '+soc.length+' societ&agrave;</span></h2>'+
@@ -1252,7 +1257,9 @@ function renderReferenti(){
         '<div>🧾 Fatturato <b>'+_refEur(fatturato)+'</b></div>'+
         '<div>💰 Incassato <b>'+_refEur(incassato)+'</b></div>'+
         '<div>⏳ Da incassare <b>'+_refEur(daInc)+'</b></div>'+
+        '<div>📋 Da fatturare <b>'+_refEur(daFatt)+'</b> <span class="sub">+IVA</span></div>'+
       '</div>'+
+      (cons.length?('<div style="margin-top:8px;font-size:12px;border-left:3px solid #e8a34b;padding-left:8px">'+cons.map(c=>'📋 '+esc((c.numero||'')+' · '+(c.cantiere_nome&&!/^[a-z0-9_]{8,}$/.test(c.cantiere_nome)?c.cantiere_nome:(c.oggetto||'').slice(0,50)))+' — '+_refEur(c.imponibile)+' <span class="sub">+IVA · '+esc(c.cliente_nome||'')+'</span>').join('<br>')+'</div>'):'')+
       (prev.length?('<div style="margin-top:8px;font-size:12px">'+prev.slice(0,6).map(p=>'• '+esc((p.numero||'')+' '+(p.oggetto||'').slice(0,50))+' — '+_refEur(p.totale)+' <span class="sub">('+esc(p.stato||'')+')</span>').join('<br>')+(prev.length>6?'<br><span class="sub">… e altri '+(prev.length-6)+'</span>':'')+'</div>'):'')+
     '</div>';
   });
@@ -2943,7 +2950,7 @@ function creaConsuntivoDaCorrente(){
 async function nuovoConsuntivoDaPreventivo(p){
   if(!p){ toast('Preventivo non trovato'); return; }
   _consId=null; _consOldImp=null; C_VOCI=[]; C_MOD=p.modalita||'dettagliata';
-  _consMeta={ preventivo_id:p.id||null, preventivo_numero:p.numero||'', cantiere_id:p.cantiere_id||null, cantiere_nome:p.cantiere_nome||p.cantiere_ref||'' };
+  _consMeta={ preventivo_id:p.id||null, preventivo_numero:p.numero||'', cantiere_id:p.cantiere_id||null, cantiere_nome:p.cantiere_nome||p.cantiere_ref||'', preventivo_imponibile:(p.imponibile!=null?parseFloat(p.imponibile):null) };
   consFillClienti(); _consResetEditor();
   document.getElementById('c-cliente').value=p.cliente_nome||'';
   document.getElementById('c-cliente-ind').value=p.cliente_indirizzo||'';
@@ -2968,6 +2975,34 @@ async function nuovoConsuntivoDaPreventivo(p){
 async function salvaConsuntivo(){
   const d=consDati();
   if(!d.cliente_nome){ toast('Inserisci il cliente'); return; }
+  // ── cantiere_id OBBLIGATORIO (proposto dal preventivo collegato) ──
+  if(!_consMeta.cantiere_id && _consMeta.preventivo_numero){
+    try{
+      const pr=await fetch(SB_URL+'/rest/v1/preventivi?select=cantiere_id,cantiere_ref,cantiere_nome,imponibile&numero=eq.'+encodeURIComponent(_consMeta.preventivo_numero)+'&limit=1',{headers:SB_H,cache:'no-cache'});
+      const pp=(await pr.json())[0];
+      if(pp && (pp.cantiere_id||pp.cantiere_ref)){
+        _consMeta.cantiere_id=pp.cantiere_id||pp.cantiere_ref;
+        if(!_consMeta.cantiere_nome) _consMeta.cantiere_nome=pp.cantiere_nome||'';
+        if(_consMeta.preventivo_imponibile==null && pp.imponibile!=null) _consMeta.preventivo_imponibile=parseFloat(pp.imponibile);
+        consRenderLink();
+      }
+    }catch(e){}
+  }
+  if(!_consMeta.cantiere_id){
+    if(d.stato==='definitivo' || d.stato==='fatturato'){
+      toast('⚠ Collega una commessa: un consuntivo definitivo/fatturato DEVE essere legato a un cantiere. Crealo dal preventivo della commessa.'); return;
+    }
+    if(!confirm('⚠ Questo consuntivo NON è collegato a nessuna commessa.\nIl ricavo del cantiere non verrà calcolato da questo documento.\n\nConsiglio: crea il consuntivo dal preventivo (così la commessa viene proposta automaticamente).\n\nSalvare comunque come bozza senza commessa?')) return;
+  }
+  // ── AVVISO se consuntivo e preventivo differiscono ──
+  if(_consMeta.preventivo_numero){
+    let pImp=_consMeta.preventivo_imponibile;
+    if(pImp==null){ try{ const pr=await fetch(SB_URL+'/rest/v1/preventivi?select=imponibile&numero=eq.'+encodeURIComponent(_consMeta.preventivo_numero)+'&limit=1',{headers:SB_H,cache:'no-cache'}); const pp=(await pr.json())[0]; if(pp) pImp=parseFloat(pp.imponibile); }catch(e){} }
+    const cImp=parseFloat(d.imponibile)||0;
+    if(pImp!=null && isFinite(pImp) && Math.abs(cImp-pImp)>Math.max(1,pImp*0.01)){
+      if(!confirm('⚠ Il consuntivo ('+eur(cImp)+') DIFFERISCE dal preventivo '+_consMeta.preventivo_numero+' ('+eur(pImp)+').\nDifferenza: '+eur(cImp-pImp)+'.\n\nÈ voluto? Salvare comunque?')) return;
+    }
+  }
   const _wasNew=!_consId; const _oldImp=_consOldImp;
   const payload=Object.assign({}, d, {
     preventivo_id:_consMeta.preventivo_id||null,
@@ -3159,7 +3194,7 @@ async function certificaRicavoCommessa(){
   const d=consDati();
   const impCons=parseFloat(d.imponibile)||0;
   const prevNum=_consMeta.preventivo_numero||null;
-  let cantNome='', ricavoAtt=0, voceImp=null, haVoce=false;
+  let cantNome='', ricavoAtt=0, voceImp=null, haVoce=false, certPrec=[];
   try{
     const r=await fetch(SB_URL+'/rest/v1/gestionale_dati?id=eq.unico&select=dati',{headers:SB_H,cache:'no-cache'});
     let dati=(await r.json())[0]; dati=dati&&dati.dati; if(typeof dati==='string') dati=JSON.parse(dati);
@@ -3170,11 +3205,19 @@ async function certificaRicavoCommessa(){
     ricavoAtt=b?(parseFloat(b.ricavoPrevisto)||0):0;
     const vv=prevNum?((c.forniture||[]).find(v=>v.preventivoRef===prevNum)):null;
     if(vv){ haVoce=true; voceImp=parseFloat(vv.importo)||0; }
+    certPrec=(b&&Array.isArray(b.consuntiviCertificati))?b.consuntiviCertificati:[];
   }catch(e){ toast('⚠ Gestionale non leggibile'); return; }
-  const nuovoRicavo = haVoce ? Math.max(0, ricavoAtt + (impCons - voceImp)) : impCons;
+  const giaCert=certPrec.find(x=>x.numero===d.numero);
+  const quotaPrec=giaCert?(parseFloat(giaCert.importo)||0):0;
+  let modo='somma';
+  if(!haVoce && ricavoAtt>0 && !certPrec.length){
+    modo = confirm('La commessa «'+cantNome+'» ha già un ricavo di '+eur(ricavoAtt)+'.\n\nOK = SOMMA il consuntivo al ricavo (lavoro a più periodi, es. mensile)\nAnnulla = SOSTITUISCI il ricavo con il consuntivo') ? 'somma' : 'sostituisci';
+  }
+  const nuovoRicavo = haVoce ? Math.max(0, ricavoAtt + (impCons - voceImp))
+                    : (modo==='sostituisci' ? impCons : Math.max(0, ricavoAtt - quotaPrec + impCons));
   const testo = haVoce
     ? ('Voce «'+(prevNum||'')+'»: '+eur(voceImp)+' → '+eur(impCons)+'\nRicavo commessa: '+eur(ricavoAtt)+' → '+eur(nuovoRicavo))
-    : ('Ricavo commessa: '+eur(ricavoAtt)+' → '+eur(impCons));
+    : ('Ricavo commessa: '+eur(ricavoAtt)+' → '+eur(nuovoRicavo)+(modo==='sostituisci'?'  (SOSTITUITO)':'  ('+(giaCert?'aggiornata la quota di '+d.numero:'+ '+eur(impCons))+')'));
   if(!confirm('Certifica il ricavo della commessa «'+cantNome+'» con il consuntivo '+(d.numero||'')+'.\n\n'+testo+'\n\nGli altri valori della commessa NON vengono toccati.\nProcedere?')) return;
   let finale;
   try{
@@ -3191,9 +3234,19 @@ async function certificaRicavoCommessa(){
         if(b){ b.ricavoPrevisto=Math.max(0,(parseFloat(b.ricavoPrevisto)||0)+(impCons-old)); nr=b.ricavoPrevisto; }
         else { dati.budgetCantieri.push({cantiereId:cantId,cantiereName:c.nome,ricavoPrevisto:impCons,note:'Consuntivo '+d.numero}); nr=impCons; }
       } else {
-        if(b){ b.ricavoPrevisto=impCons; b.consuntivato=true; b.consuntivo_numero=d.numero; b.note=(b.note?b.note+' · ':'')+'ricavo certificato da consuntivo '+d.numero; }
-        else { dati.budgetCantieri.push({cantiereId:cantId,cantiereName:c.nome,ricavoPrevisto:impCons,consuntivato:true,consuntivo_numero:d.numero,note:'Ricavo certificato da consuntivo '+d.numero}); }
-        nr=impCons;
+        if(!b){ b={cantiereId:cantId,cantiereName:c.nome,ricavoPrevisto:0,note:''}; dati.budgetCantieri.push(b); }
+        const lista=Array.isArray(b.consuntiviCertificati)?b.consuntiviCertificati:[];
+        const prec=lista.find(x=>x.numero===d.numero);
+        const att=parseFloat(b.ricavoPrevisto)||0;
+        if(modo==='sostituisci'){ b.ricavoPrevisto=impCons; b.consuntiviCertificati=[{numero:d.numero,importo:impCons}]; }
+        else {
+          b.ricavoPrevisto=Math.max(0, att - (prec?(parseFloat(prec.importo)||0):0) + impCons);
+          if(prec) prec.importo=impCons; else lista.push({numero:d.numero,importo:impCons});
+          b.consuntiviCertificati=lista;
+        }
+        b.consuntivato=true; b.consuntivo_numero=d.numero;
+        if(!prec) b.note=(b.note?b.note+' · ':'')+'+ '+eur(impCons)+' da consuntivo '+d.numero;
+        nr=b.ricavoPrevisto;
       }
       c.consuntivato=true; c.consuntivo_numero=d.numero;
       return nr;
