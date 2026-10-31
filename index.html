@@ -1214,6 +1214,8 @@ function vista(v){
 // ═══════════════════════════════════════════════════════════
 let _refFatt=null;   // cache fatture (con importo) per i totali per referente
 let _refCons=[];     // consuntivi definitivi/inviati = da fatturare
+let _refAlloc=[];    // allocazioni fattura→consuntivo (per il residuo)
+function _refResiduo(c){ const imp=(+c.imponibile||0); const al=(_refAlloc||[]).filter(a=>a&&!a.cancellato_il&&a.consuntivo_numero===c.numero).reduce((s,a)=>s+(+a.importo||0),0); return Math.max(0, imp-al); }
 function _refEur(n){ return '€ '+(Number(n)||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function _refAccSum(f){ return Array.isArray(f.acconti)?f.acconti.reduce((s,a)=>s+(+a.importo||0),0):0; }
 async function caricaReferenti(){
@@ -1223,6 +1225,7 @@ async function caricaReferenti(){
   try{ if(!LISTA||!LISTA.length){ const r=await fetch(SB_URL+'/rest/v1/preventivi?select=*&order=creato_il.desc',{headers:SB_H,cache:'no-cache'}); LISTA=await r.json(); if(!Array.isArray(LISTA))LISTA=[]; } }catch(e){}
   try{ const r=await fetch(SB_URL+'/rest/v1/fatture?select=numero,cliente,importo,stato,data_pagamento,acconti',{headers:SB_H,cache:'no-cache'}); _refFatt=await r.json(); if(!Array.isArray(_refFatt))_refFatt=[]; }catch(e){ _refFatt=[]; }
   try{ const r=await fetch(SB_URL+'/rest/v1/consuntivi?select=id,numero,data,cliente_nome,cantiere_nome,oggetto,imponibile,stato&stato=in.(definitivo,inviato)&order=data.desc',{headers:SB_H,cache:'no-cache'}); _refCons=await r.json(); if(!Array.isArray(_refCons))_refCons=[]; }catch(e){ _refCons=[]; }
+  try{ const r=await fetch(SB_URL+'/rest/v1/allocazioni_fatture?select=consuntivo_numero,importo,cancellato_il&cancellato_il=is.null&limit=10000',{headers:SB_H,cache:'no-cache'}); _refAlloc=await r.json(); if(!Array.isArray(_refAlloc))_refAlloc=[]; }catch(e){ _refAlloc=[]; }
   renderReferenti();
 }
 function renderReferenti(){
@@ -1244,8 +1247,8 @@ function renderReferenti(){
     const fatturato=fatt.reduce((s,f)=>s+(+f.importo||0),0);
     const incassato=fatt.reduce((s,f)=>s+((f.stato==='pagata')?(+f.importo||0):_refAccSum(f)),0);
     const daInc=Math.max(0,fatturato-incassato);
-    const cons=(_refCons||[]).filter(c=>match(c.cliente_nome));
-    const daFatt=cons.reduce((s,c)=>s+(+c.imponibile||0),0);
+    const cons=(_refCons||[]).filter(c=>match(c.cliente_nome)).filter(c=>_refResiduo(c)>0.009);
+    const daFatt=cons.reduce((s,c)=>s+_refResiduo(c),0);
     html+='<div class="card" style="margin-bottom:10px">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">'+
         '<h2 style="margin:0">👤 '+esc(nome)+' <span class="sub" style="font-weight:400">· '+soc.length+' societ&agrave;</span></h2>'+
@@ -1259,7 +1262,7 @@ function renderReferenti(){
         '<div>⏳ Da incassare <b>'+_refEur(daInc)+'</b></div>'+
         '<div>📋 Da fatturare <b>'+_refEur(daFatt)+'</b> <span class="sub">+IVA</span></div>'+
       '</div>'+
-      (cons.length?('<div style="margin-top:8px;font-size:12px;border-left:3px solid #e8a34b;padding-left:8px">'+cons.map(c=>'📋 '+esc((c.numero||'')+' · '+(c.cantiere_nome&&!/^[a-z0-9_]{8,}$/.test(c.cantiere_nome)?c.cantiere_nome:(c.oggetto||'').slice(0,50)))+' — '+_refEur(c.imponibile)+' <span class="sub">+IVA · '+esc(c.cliente_nome||'')+'</span>').join('<br>')+'</div>'):'')+
+      (cons.length?('<div style="margin-top:8px;font-size:12px;border-left:3px solid #e8a34b;padding-left:8px">'+cons.map(c=>{ const res=_refResiduo(c); const imp=(+c.imponibile||0); const parz=res<imp-0.009; return '📋 '+esc((c.numero||'')+' · '+(c.cantiere_nome&&!/^[a-z0-9_]{8,}$/.test(c.cantiere_nome)?c.cantiere_nome:(c.oggetto||'').slice(0,50)))+' — '+_refEur(res)+' <span class="sub">+IVA'+(parz?' · residuo di '+_refEur(imp):'')+' · '+esc(c.cliente_nome||'')+'</span>'; }).join('<br>')+'</div>'):'')+
       (prev.length?('<div style="margin-top:8px;font-size:12px">'+prev.slice(0,6).map(p=>'• '+esc((p.numero||'')+' '+(p.oggetto||'').slice(0,50))+' — '+_refEur(p.totale)+' <span class="sub">('+esc(p.stato||'')+')</span>').join('<br>')+(prev.length>6?'<br><span class="sub">… e altri '+(prev.length-6)+'</span>':'')+'</div>'):'')+
     '</div>';
   });
