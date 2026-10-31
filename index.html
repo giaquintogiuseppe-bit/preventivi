@@ -270,7 +270,18 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
     <button class="bs" onclick="vista('consarchivio')">📊 Consuntivi</button>
     <button class="bs" onclick="vista('docarchivio')">🗂 Documenti</button>
     <button class="bs" onclick="vista('modifiche')">🕘 Modifiche</button>
+    <button class="bs" onclick="vista('referenti')">🔗 Referenti</button>
     <button class="btn" onclick="nuovoPreventivo()">+ Nuovo prev.</button>
+  </div>
+
+  <!-- VISTA REFERENTI (Rapporti) -->
+  <div id="v-referenti" style="display:none">
+    <div class="card">
+      <h2>🔗 Referenti</h2>
+      <div class="sub" style="margin-bottom:10px">Le persone che tengono i rapporti: per ciascuna, le società collegate e i totali (preventivato, fatturato, incassato). I collegamenti si gestiscono dal Gestionale.</div>
+      <input id="ref-cerca" oninput="renderReferenti()" placeholder="🔎 Cerca referente o società…" style="width:100%;box-sizing:border-box">
+    </div>
+    <div id="ref-list"></div>
   </div>
 
   <!-- VISTA EDITOR -->
@@ -1186,14 +1197,76 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 function eur(n){return '€ '+parseFloat(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function vista(v){
-  const mappa={editor:'v-editor',lista:'v-lista',richieste:'v-richieste',documenti:'v-documenti',docarchivio:'v-docarchivio',consuntivo:'v-consuntivo',consarchivio:'v-consarchivio',modifiche:'v-modifiche'};
+  const mappa={editor:'v-editor',lista:'v-lista',richieste:'v-richieste',documenti:'v-documenti',docarchivio:'v-docarchivio',consuntivo:'v-consuntivo',consarchivio:'v-consarchivio',modifiche:'v-modifiche',referenti:'v-referenti'};
   Object.keys(mappa).forEach(k=>{const el=document.getElementById(mappa[k]); if(el) el.style.display=(v===k)?'block':'none';});
   if(v==='lista')caricaLista();
   if(v==='richieste')caricaRichieste();
   if(v==='docarchivio')caricaDocumenti();
   if(v==='consarchivio')caricaConsuntivi();
   if(v==='modifiche')caricaModifiche();
+  if(v==='referenti')caricaReferenti();
   try{window.scrollTo(0,0);}catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════
+// REFERENTI (Rapporti) — scheda per referente: società, preventivi, fatturato
+// ═══════════════════════════════════════════════════════════
+let _refFatt=null;   // cache fatture (con importo) per i totali per referente
+function _refEur(n){ return '€ '+(Number(n)||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function _refAccSum(f){ return Array.isArray(f.acconti)?f.acconti.reduce((s,a)=>s+(+a.importo||0),0):0; }
+async function caricaReferenti(){
+  const box=document.getElementById('ref-list'); if(box) box.innerHTML='<div class="sub" style="padding:16px">Carico…</div>';
+  try{ if(!CLIENTI||!CLIENTI.length) await caricaClienti(); }catch(e){}
+  try{ if(!REFPREV||!Object.keys(REFPREV).length) await _caricaReferentiPrev(); }catch(e){}
+  try{ if(!LISTA||!LISTA.length){ const r=await fetch(SB_URL+'/rest/v1/preventivi?select=*&order=creato_il.desc',{headers:SB_H,cache:'no-cache'}); LISTA=await r.json(); if(!Array.isArray(LISTA))LISTA=[]; } }catch(e){}
+  try{ const r=await fetch(SB_URL+'/rest/v1/fatture?select=numero,cliente,importo,stato,data_pagamento,acconti',{headers:SB_H,cache:'no-cache'}); _refFatt=await r.json(); if(!Array.isArray(_refFatt))_refFatt=[]; }catch(e){ _refFatt=[]; }
+  renderReferenti();
+}
+function renderReferenti(){
+  const box=document.getElementById('ref-list'); if(!box) return;
+  const q=(document.getElementById('ref-cerca')&&document.getElementById('ref-cerca').value||'').toLowerCase();
+  const perRef={}; (CLIENTI||[]).forEach(c=>{ if(!c.referenteId) return; (perRef[c.referenteId]=perRef[c.referenteId]||[]).push(c); });
+  let ids=Object.keys(perRef);
+  if(!ids.length){ box.innerHTML='<div class="card"><div class="sub">Nessun referente collegato. Collega i clienti a un referente dal Gestionale (scheda cliente → "Fa capo a").</div></div>'; return; }
+  ids.sort((a,b)=>(REFPREV[a]||'').localeCompare(REFPREV[b]||''));
+  let html='';
+  ids.forEach(rid=>{
+    const nome=REFPREV[rid]||'(referente)'; const soc=perRef[rid];
+    if(q && !(nome.toLowerCase().includes(q) || soc.some(c=>(c.nome||'').toLowerCase().includes(q)))) return;
+    const socN=soc.map(c=>_normNome(c.nome||'')).filter(Boolean);
+    const match=nm=>{ const n=_normNome(nm||''); return !!n && socN.some(sn=>sn===n || (sn.length>3 && (n.indexOf(sn)>=0 || sn.indexOf(n)>=0))); };
+    const prev=(LISTA||[]).filter(p=>match(p.cliente_nome));
+    const fatt=(_refFatt||[]).filter(f=>match(f.cliente));
+    const preventivato=prev.reduce((s,p)=>s+(+p.totale||0),0);
+    const fatturato=fatt.reduce((s,f)=>s+(+f.importo||0),0);
+    const incassato=fatt.reduce((s,f)=>s+((f.stato==='pagata')?(+f.importo||0):_refAccSum(f)),0);
+    const daInc=Math.max(0,fatturato-incassato);
+    html+='<div class="card" style="margin-bottom:10px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">'+
+        '<h2 style="margin:0">👤 '+esc(nome)+' <span class="sub" style="font-weight:400">· '+soc.length+' societ&agrave;</span></h2>'+
+        '<button class="bs" onclick="nuovoPrevReferente(\''+rid+'\')">+ Nuovo preventivo</button>'+
+      '</div>'+
+      '<div class="sub" style="font-size:12px;margin:4px 0 10px">'+soc.map(c=>esc(c.nome||'')).join(' · ')+'</div>'+
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">'+
+        '<div>📄 Preventivi <b>'+prev.length+'</b> · '+_refEur(preventivato)+'</div>'+
+        '<div>🧾 Fatturato <b>'+_refEur(fatturato)+'</b></div>'+
+        '<div>💰 Incassato <b>'+_refEur(incassato)+'</b></div>'+
+        '<div>⏳ Da incassare <b>'+_refEur(daInc)+'</b></div>'+
+      '</div>'+
+      (prev.length?('<div style="margin-top:8px;font-size:12px">'+prev.slice(0,6).map(p=>'• '+esc((p.numero||'')+' '+(p.oggetto||'').slice(0,50))+' — '+_refEur(p.totale)+' <span class="sub">('+esc(p.stato||'')+')</span>').join('<br>')+(prev.length>6?'<br><span class="sub">… e altri '+(prev.length-6)+'</span>':'')+'</div>'):'')+
+    '</div>';
+  });
+  box.innerHTML=html||'<div class="card"><div class="sub">Nessun referente corrisponde alla ricerca.</div></div>';
+}
+function nuovoPrevReferente(rid){
+  const soc=(CLIENTI||[]).filter(c=>c.referenteId===rid);
+  nuovoPreventivo();
+  if(soc[0]){ setTimeout(()=>{ try{
+    const nm=document.getElementById('p-cliente'); if(nm) nm.value=soc[0].nome||'';
+    const ind=document.getElementById('p-cliente-ind'); if(ind) ind.value=soc[0].indirizzo||'';
+    const piva=document.getElementById('p-cliente-piva'); if(piva) piva.value=soc[0].piva||'';
+    const info=document.getElementById('cli-ref-info'); if(info){ info.style.display='block'; info.innerHTML='👤 Fa capo a <b>'+esc(REFPREV[rid]||'')+'</b>'; }
+  }catch(e){} }, 60); }
 }
 
 // ═══════════════════════════════════════════════════════════
