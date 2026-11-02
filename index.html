@@ -1006,6 +1006,14 @@ async function _sincronizzaVoceCantiere(p){
   const imp = parseFloat(p.imponibile||0) || (typeof datiCorrenti==='function' ? (parseFloat(datiCorrenti().imponibile||0)||0) : 0);
   if(!(imp>0)) return null;
   const oggetto=(p.oggetto||'').trim();
+  // Un consuntivo finale che rendiconta questo preventivo comanda il ricavo (stessa regola del
+  // Gestionale): il preventivo NON va né aggiunto né sommato. (02/11/2026: PREV-2026-073 rivisto
+  // dopo CONS-2026-006 veniva aggiunto come voce integrativa → ricavo contato due volte.)
+  try{
+    const rc=await fetch(SB_URL+'/rest/v1/consuntivi?select=numero&preventivo_numero=eq.'+encodeURIComponent(numeroPrev)+'&stato=in.(definitivo,inviato,fatturato)&limit=1',{headers:SB_H});
+    const jc=rc.ok?await rc.json():[];
+    if(Array.isArray(jc)&&jc.length) return {ok:true,tipo:'consuntivato',nome:'',consuntivo:jc[0].numero,importo:imp};
+  }catch(e){ /* senza risposta si prosegue come prima */ }
   const cantIdEsplicito=(p.cantiere_id && p.cantiere_id!=='__nessuno__' && p.cantiere_id!=='__auto__') ? p.cantiere_id : null;
   let esito=null;
   await _blobPatchSicuro(dati=>{
@@ -1062,7 +1070,10 @@ async function aggiornaCommessaGestionale(){
   const p=window._pAperto;
   if(!p||!_editId){ toast('Apri e salva prima il preventivo'); return; }
   if(p.stato!=='accettato'){ toast('Solo i preventivi accettati aggiornano la commessa'); return; }
-  const impPrec=parseFloat(p.imponibile||0)||0;          // imponibile prima di questa modifica
+  // imponibile prima di questa modifica: l'ultima revisione registrata, altrimenti quello all'apertura.
+  // (Prima si usava p.imponibile: dopo un «Salva» era già il valore nuovo → nessuna revisione.)
+  const _rv=(Array.isArray(p.revisioni)?p.revisioni:[]).filter(r=>r&&r.imponibile!=null&&isFinite(parseFloat(r.imponibile))).sort((a,b)=>(b.rev||0)-(a.rev||0))[0];
+  const impPrec=_rv?parseFloat(_rv.imponibile):(p._impRev!=null?p._impRev:(parseFloat(p.imponibile||0)||0));
   const d=datiCorrenti();
   const impNew=parseFloat(d.imponibile||0)||0;
   // 1) persisti le modifiche correnti del preventivo
@@ -1077,6 +1088,7 @@ async function aggiornaCommessaGestionale(){
   catch(e){ toast('⚠ '+String(e.message||e).slice(0,60)); return; }
   if(!es){ toast('Niente da sincronizzare'); return; }
   if(!es.ok){ toast(es.motivo==='nocant'?'⚠ Nessuna commessa collegata: collega prima un cantiere (🔗)':'⚠ Sincronizzazione non riuscita'); return; }
+  if(es.tipo==='consuntivato' && es.consuntivo) toast('ℹ Il ricavo della commessa segue il consuntivo '+es.consuntivo+': aggiorna anche quello');
   // 3) registra la revisione SOLO se l'imponibile è davvero cambiato
   if(Math.abs(impNew-impPrec)<0.005){
     await _refreshCantV(); renderVitaBox();
@@ -1084,18 +1096,20 @@ async function aggiornaCommessaGestionale(){
     return;
   }
   const revs=Array.isArray(p.revisioni)?p.revisioni.slice():[];
-  const nRev=(parseInt(p.rev,10)||revs.length||0)+1;
+  const nRev=Math.max(parseInt(p.rev,10)||0, ...revs.map(r=>parseInt(r&&r.rev,10)||0))+1;
   revs.push({ rev:nRev, data:new Date().toISOString(),
     imponibile:impNew, imponibile_prec:impPrec, totale:parseFloat(d.totale||0)||0,
     righe_n:(d.righe||[]).length, tipo:es.tipo||'', commessa:es.nome||'' });
   try{
     await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:SB_H,
       body:JSON.stringify({rev:nRev,revisioni:revs,aggiornato_il:new Date().toISOString()})});
-    p.rev=nRev; p.revisioni=revs;
+    p.rev=nRev; p.revisioni=revs; p._impRev=impNew;
   }catch(e){ /* la commessa è già aggiornata: la revisione non è critica */ }
   await _refreshCantV(); renderVitaBox();
   const delta=impNew-impPrec;
-  toast('✓ Commessa «'+(es.nome||'')+'» aggiornata → rev.'+nRev+' ('+(delta>=0?'+':'')+eur(delta)+')');
+  toast(es.tipo==='consuntivato'
+    ? '✓ Preventivo → rev.'+nRev+' ('+(delta>=0?'+':'')+eur(delta)+') · il ricavo segue il consuntivo '+(es.consuntivo||'')
+    : '✓ Commessa «'+(es.nome||'')+'» aggiornata → rev.'+nRev+' ('+(delta>=0?'+':'')+eur(delta)+')');
 }
 function apriStoricoRevisioni(){
   if(!window._pAperto) return;
@@ -2177,6 +2191,7 @@ async function cambiaStato(nuovo){
           await _refreshCantV(); renderVitaBox();
           toast(es.tipo==='base' ? '✓ Accettato — ricavo commessa impostato ('+eur(es.importo)+')'
               : es.tipo==='update' ? '✓ Accettato — voce aggiornata ('+eur(es.importo)+')'
+              : es.tipo==='consuntivato' ? '✓ Accettato — il ricavo segue il consuntivo '+(es.consuntivo||'')
               : '✓ Accettato — voce integrativa +'+eur(es.importo)+' su «'+es.nome+'»');
           await _attrDopoAccettato(p); renderAttr();
           return;
@@ -2240,6 +2255,9 @@ async function apriPreventivo(id){
   vista('editor');_editId=id;
   _statoCorrente=p.stato||'bozza';
   window._pAperto=p;
+  // imponibile "di riferimento" per le revisioni: quello con cui il preventivo è stato aperto.
+  // Il pulsante Salva aggiorna p.imponibile, ma la revisione va misurata rispetto a questo.
+  p._impRev=parseFloat(p.imponibile||0)||0;
   renderVitaBox();
   const be=document.getElementById('btn-elimina'); if(be) be.style.display='inline-block';
   const bc=document.getElementById('btn-cantiere'); if(bc) bc.style.display='inline-block';
