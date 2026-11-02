@@ -1072,8 +1072,12 @@ async function aggiornaCommessaGestionale(){
   if(p.stato!=='accettato'){ toast('Solo i preventivi accettati aggiornano la commessa'); return; }
   // imponibile prima di questa modifica: l'ultima revisione registrata, altrimenti quello all'apertura.
   // (Prima si usava p.imponibile: dopo un «Salva» era già il valore nuovo → nessuna revisione.)
-  const _rv=(Array.isArray(p.revisioni)?p.revisioni:[]).filter(r=>r&&r.imponibile!=null&&isFinite(parseFloat(r.imponibile))).sort((a,b)=>(b.rev||0)-(a.rev||0))[0];
-  const impPrec=_rv?parseFloat(_rv.imponibile):(p._impRev!=null?p._impRev:(parseFloat(p.imponibile||0)||0));
+  // Le revisioni vecchie hanno solo le righe (non l'imponibile): lo si ricava dalle righe.
+  const _impDi=r=>{ if(r&&r.imponibile!=null&&isFinite(parseFloat(r.imponibile))) return parseFloat(r.imponibile);
+    if(r&&Array.isArray(r.righe)&&r.righe.length) return r.righe.reduce((t,x)=>t+(parseFloat(x&&x.qta)||0)*(parseFloat(x&&x.prezzo)||0),0);
+    return null; };
+  const _rv=(Array.isArray(p.revisioni)?p.revisioni:[]).filter(r=>_impDi(r)!=null).sort((a,b)=>(b.rev||0)-(a.rev||0))[0];
+  const impPrec=_rv?_impDi(_rv):(p._impRev!=null?p._impRev:(parseFloat(p.imponibile||0)||0));
   const d=datiCorrenti();
   const impNew=parseFloat(d.imponibile||0)||0;
   // 1) persisti le modifiche correnti del preventivo
