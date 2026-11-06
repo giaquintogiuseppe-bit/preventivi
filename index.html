@@ -500,6 +500,8 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
   <div id="v-lista" style="display:none">
     <div class="card">
       <h2>📁 Archivio preventivi</h2>
+      <div id="lista-kpi"></div>
+      <div id="lista-chips"></div>
       <input id="cerca-prev" placeholder="🔍 Cerca per numero, cliente, oggetto..." oninput="renderLista()" style="margin-bottom:12px">
       <div id="lista-prev"></div>
     </div>
@@ -2318,6 +2320,32 @@ function _vitaHTML(p,compatto){
     `<span title="${esc(t.tit)}" style="font-size:${compatto?'10px':'12px'};line-height:1;padding:${compatto?'2px 5px':'3px 7px'};border-radius:9px;border:1px solid ${t.on?'var(--teal,#0E6B64)':'var(--brd,#E1E5EA)'};background:${t.on?'rgba(14,107,100,.15)':'transparent'};opacity:${t.on?'1':'.42'}">${t.ico}</span>`
   ).join('<span style="color:var(--brd,#E1E5EA);font-size:9px">—</span>')+'</span>';
 }
+// Stepper visivo "Vita del lavoro" per la scheda: Bozza → Inviato → Accettato → Cantiere → Fatturato → Saldato
+function _vitaStepper(p){
+  const v=_vitaPrev(p); const s=p.stato||'bozza';
+  const T='var(--teal,#0E6B64)', B='var(--line-strong,#cbd2da)', t2='var(--text2,#556070)';
+  if(s==='annullato'||s==='perso'){
+    return '<span style="font-size:11px;font-weight:700;color:var(--red,#B42318);background:var(--danger-soft,#fce8e6);border:1px solid var(--red,#B42318);border-radius:999px;padding:3px 10px">⊘ '+(s==='perso'?'Perso':'Annullato')+'</span>';
+  }
+  const inviato=v.acc||s==='inviato';
+  const tappe=[
+    {done:true,     now:(s==='bozza'&&!inviato), l:'Bozza'},
+    {done:inviato,  now:(s==='inviato'&&!v.acc), l:'Inviato'},
+    {done:v.acc,    now:(v.acc&&!v.cant),         l:'Accettato'},
+    {done:v.cant,   now:(v.cant&&!v.fatt),        l:'Cantiere'},
+    {done:v.fatt,   now:(v.fatt&&!v.pagata),      l:'Fatturato'},
+    {done:v.pagata, now:v.pagata,                 l:'Saldato'}
+  ];
+  let h='<span style="display:inline-flex;align-items:center;flex-wrap:wrap;gap:0">';
+  tappe.forEach((t,i)=>{
+    if(i) h+='<span style="width:14px;height:2px;background:'+(t.done?T:B)+'"></span>';
+    const bg=t.done?T:'transparent', bd=(t.done||t.now)?T:B, col=t.done?'var(--text,#18222f)':(t.now?T:t2);
+    h+='<span style="display:inline-flex;align-items:center;gap:5px;margin-right:2px">'
+      +'<span style="width:16px;height:16px;border-radius:50%;background:'+bg+';border:2px solid '+bd+';'+(t.now&&!t.done?'box-shadow:0 0 0 3px var(--accent-soft,#e3f1ef)':'')+'"></span>'
+      +'<span style="font-size:11px;font-weight:600;color:'+col+'">'+t.l+'</span></span>';
+  });
+  return h+'</span>';
+}
 
 // Box "vita del lavoro" nell'editor: indicatore + selettore stato + collega cantiere
 function renderVitaBox(){
@@ -2329,7 +2357,7 @@ function renderVitaBox(){
   if(p.stato&&!stati.includes(p.stato)) stati.push(p.stato); // es. "convertito" legacy
   vb.style.display='flex'; vb.style.flexWrap='wrap';
   vb.innerHTML='<b style="color:var(--text2,#556070);text-transform:uppercase;letter-spacing:.5px;font-size:10px">Vita del lavoro</b> '
-    +_vitaHTML(p,false)
+    +_vitaStepper(p)+'<span style="flex-basis:100%;height:4px"></span>'
     +'<span style="color:var(--text2,#556070)">'+frase+'</span>'
     +'<span style="flex:1"></span>'
     +'<label style="font-size:10px;color:var(--text2,#556070);text-transform:uppercase">Stato</label>'
@@ -2415,9 +2443,49 @@ async function scegliCollega(id){
     toast(val===null?'✓ Riconoscimento automatico':val==='__nessuno__'?'✓ Cantiere scollegato':'✓ Collegato a '+(v.cantNome||'cantiere'));
   }catch(e){ toast('⚠ Errore collegamento'); }
 }
+// ── Cruscotto + filtri lista (additivo: calcola da LISTA già in memoria) ──
+let FILTRO_STATO='';
+function _matchStato(p){
+  if(!FILTRO_STATO) return true;
+  const s=p.stato||'bozza';
+  if(FILTRO_STATO==='accettato') return s==='accettato'||s==='convertito';
+  if(FILTRO_STATO==='annullato') return s==='annullato'||s==='perso';
+  return s===FILTRO_STATO;
+}
+window.filtraStato=function(v){ FILTRO_STATO=v; renderLista(); };
+function _renderKpiLista(){
+  const box=document.getElementById('lista-kpi'); if(!box) return;
+  const L=Array.isArray(LISTA)?LISTA:[]; const val=p=>parseFloat(p.totale||p.imponibile||0)||0;
+  const inv=L.filter(p=>(p.stato||'')==='inviato');
+  const acc=L.filter(p=>p.stato==='accettato'||p.stato==='convertito');
+  const ann=L.filter(p=>p.stato==='annullato'||p.stato==='perso');
+  const decisi=acc.length+ann.length;
+  const conv=decisi?Math.round(acc.length/decisi*100):null;
+  const oggi=Date.now();
+  const fermi=inv.filter(p=>{ const d=p.data?Date.parse(p.data):NaN; return isFinite(d)&&(oggi-d)>30*864e5; }).length;
+  const sumInv=inv.reduce((s,p)=>s+val(p),0), sumAcc=acc.reduce((s,p)=>s+val(p),0);
+  const tile=(lb,vl,sb,warn)=>'<div style="flex:1;min-width:132px;background:var(--surface-2,#f7f8fa);border:1px solid '+(warn?'var(--gold,#9A5B00)':'var(--brd,#E1E5EA)')+';border-radius:10px;padding:10px 12px">'
+    +'<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text2,#556070)">'+lb+'</div>'
+    +'<div style="font-size:20px;font-weight:700'+(warn?';color:var(--gold,#9A5B00)':'')+'">'+vl+'</div>'
+    +'<div style="font-size:11px;color:var(--text2,#556070)">'+sb+'</div></div>';
+  box.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px';
+  box.innerHTML=tile('In trattativa',eur(sumInv),inv.length+' inviati')
+    +tile('Accettati',eur(sumAcc),acc.length+' preventivi')
+    +tile('Conversione',(conv==null?'—':conv+'%'),'accettati / decisi')
+    +tile('Da ricontattare',String(fermi),'inviati fermi da >30 gg',fermi>0);
+}
+function _renderChipsLista(){
+  const box=document.getElementById('lista-chips'); if(!box) return;
+  const opts=[['','Tutti'],['bozza','Bozze'],['inviato','Inviati'],['accettato','Accettati'],['annullato','Annullati']];
+  box.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px';
+  box.innerHTML=opts.map(o=>{ const v=o[0],l=o[1],on=(FILTRO_STATO===v);
+    return '<span onclick="filtraStato(\''+v+'\')" style="cursor:pointer;font-size:13px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid '+(on?'var(--text,#18222f)':'var(--line-strong,#cbd2da)')+';background:'+(on?'var(--text,#18222f)':'var(--surface,#fff)')+';color:'+(on?'var(--surface,#fff)':'var(--text2,#556070)')+'">'+l+'</span>';
+  }).join('');
+}
 function renderLista(){
   const q=(document.getElementById('cerca-prev').value||'').toLowerCase();
-  const f=LISTA.filter(p=>!q||((p.numero||'')+(p.cliente_nome||'')+(p.oggetto||'')).toLowerCase().includes(q));
+  const f=LISTA.filter(p=>_matchStato(p)&&(!q||((p.numero||'')+(p.cliente_nome||'')+(p.oggetto||'')).toLowerCase().includes(q)));
+  _renderKpiLista(); _renderChipsLista();
   document.getElementById('lista-prev').innerHTML=f.length?f.map(p=>`
     <div class="list-item" onclick="apriPreventivo(${p.id})">
       <div style="min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px"><span class="li-num">${esc(p.numero)}</span>${_statoPrevBadge(p)}</div>
