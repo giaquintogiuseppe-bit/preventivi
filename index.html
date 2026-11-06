@@ -478,6 +478,9 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
 
     <div id="vita-box" style="display:none;align-items:center;gap:10px;margin-bottom:12px;background:var(--card,#FFFFFF);border:1px solid var(--brd,#E1E5EA);border-radius:10px;padding:9px 14px;font-size:12px"></div>
 
+    <!-- Revisioni in evidenza: timeline inline (legge p.revisioni, additiva) -->
+    <div id="rev-box" style="display:none;margin-bottom:12px"></div>
+
     <!-- barra azioni sempre visibile in basso: totale + Salva + PDF -->
     <div class="azioni-bar">
       <div class="azioni-tot"><span>Totale</span><b id="t-totale-bar">€ 0,00</b></div>
@@ -1231,6 +1234,45 @@ function apriStoricoRevisioni(){
   const m=document.getElementById('m-revisioni'); if(m) m.style.display='flex';
 }
 function chiudiStoricoRevisioni(){ const m=document.getElementById('m-revisioni'); if(m) m.style.display='none'; }
+// Timeline revisioni SEMPRE visibile nella scheda (additiva: legge p.revisioni, non scrive nulla).
+function renderRevBox(){
+  const box=document.getElementById('rev-box'); if(!box) return;
+  const p=window._pAperto;
+  const revs=(p&&Array.isArray(p.revisioni))?p.revisioni.slice().sort((a,b)=>(b.rev||0)-(a.rev||0)):[];
+  if(!p || !revs.length){ box.style.display='none'; box.innerHTML=''; return; }
+  const _imp=r=>{ if(r&&r.imponibile!=null&&isFinite(parseFloat(r.imponibile))) return parseFloat(r.imponibile);
+    if(r&&Array.isArray(r.righe)&&r.righe.length) return r.righe.reduce((t,x)=>t+(parseFloat(x&&x.qta)||0)*(parseFloat(x&&x.prezzo)||0),0); return null; };
+  const t='var(--teal,#0E6B64)', g='var(--gold,#9A5B00)', t2='var(--text2,#556070)', br='var(--brd,#E1E5EA)', mono='var(--mono,ui-monospace,monospace)';
+  const ultima=revs[0];
+  const dLast=(ultima&&ultima.imponibile_prec!=null&&_imp(ultima)!=null)?(_imp(ultima)-parseFloat(ultima.imponibile_prec||0)):null;
+  const nodi=revs.map((r,i)=>{
+    const imp=_imp(r);
+    const delta=(r.imponibile_prec!=null&&imp!=null)?(imp-parseFloat(r.imponibile_prec||0)):null;
+    const col=delta==null?t2:(delta>0?t:'#B42318');
+    const dt=r.data?new Date(r.data).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'2-digit'}):'';
+    const causa = r.tipo==='consuntivato' ? '🧾 segue il consuntivo'
+               : (r.commessa ? '🔄 commessa «'+esc(r.commessa)+'»' : 'aggiornamento ricavo');
+    const corr=(i===0);
+    return '<div style="position:relative;padding:8px 0 8px 18px;'+(i?'border-top:1px dashed '+br:'')+'">'
+      +'<span style="position:absolute;left:1px;top:13px;width:9px;height:9px;border-radius:50%;background:'+(corr?t:'#fff')+';border:2px solid '+(corr?t:br)+'"></span>'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'
+        +'<span><b style="font-size:12.5px">rev.'+esc(String(r.rev))+(corr?' · attuale':'')+'</b> <span style="font-size:11px;color:'+t2+'">'+esc(dt)+'</span></span>'
+        +(imp!=null?'<span style="font-family:'+mono+';font-weight:700;font-size:13px">'+eur(imp)+'</span>':'')
+      +'</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:2px">'
+        +'<span style="font-size:11px;color:'+t2+'">'+causa+(r.righe_n?' · '+r.righe_n+' voci':'')+'</span>'
+        +(delta!=null?'<span style="font-family:'+mono+';font-weight:700;font-size:12px;color:'+col+'">'+(delta>=0?'+':'')+eur(delta)+'</span>':'')
+      +'</div></div>';
+  }).join('');
+  box.style.display='block';
+  box.innerHTML='<div style="background:var(--card,#fff);border:1px solid '+br+';border-radius:10px;padding:12px 14px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">'
+      +'<b style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:'+t2+'">📜 Revisioni ('+revs.length+')</b>'
+      +(dLast!=null?'<span style="font-size:11px;color:'+t2+'">ultima '+(dLast>=0?'+':'')+eur(dLast)+'</span>':'')
+    +'</div>'+nodi
+    +'<div style="margin-top:8px;text-align:right"><span onclick="apriStoricoRevisioni()" style="cursor:pointer;font-size:11px;color:'+g+'" title="Apri lo storico completo">Storico completo ›</span></div>'
+  +'</div>';
+}
 function renderStoricoRevisioni(){
   const p=window._pAperto; const cont=document.getElementById('revisioni-lista'); if(!cont) return;
   const revs=(Array.isArray(p&&p.revisioni)?p.revisioni:[]).slice().sort((a,b)=>(b.rev||0)-(a.rev||0));
@@ -1660,6 +1702,7 @@ async function nuovoPreventivo(){
   const bc=document.getElementById('btn-cantiere'); if(bc) bc.style.display='none';
   const bco=document.getElementById('btn-consuntivo'); if(bco) bco.style.display='none';
   const vb=document.getElementById('vita-box'); if(vb) vb.style.display='none';
+  const rb=document.getElementById('rev-box'); if(rb){ rb.style.display='none'; rb.innerHTML=''; }
   vista('editor'); setModalita('dettagliata');
   document.getElementById('cli-select').value='';
   ['p-cliente','p-cliente-ind','p-cliente-piva','p-cliente-rif','p-rif','p-oggetto','p-intro','p-materiali','p-corpo-desc','p-corpo-imp'].forEach(id=>document.getElementById(id).value='');
@@ -2294,6 +2337,7 @@ function renderVitaBox(){
     +stati.map(s=>`<option value="${s}"${s===(p.stato||'bozza')?' selected':''}>${s}</option>`).join('')+'</select>'
     +'<span onclick="apriCollega()" style="cursor:pointer;font-size:11px;color:var(--gold,#9A5B00)">🔗 '+(v.manuale?'cantiere collegato a mano':'collega cantiere')+'</span>'
     +_vitaAzioniCommessa(p,v);
+  try{ renderRevBox(); }catch(e){}
 }
 // Azioni commessa nel box "vita del lavoro": pulsante "Aggiorna commessa" (solo se
 // accettato + cantiere collegato) e link allo storico revisioni.
