@@ -1,35 +1,76 @@
-// sw.js — SERVICE WORKER DI PULIZIA ("kill switch"), v27.
+// sw.js — service worker dell'app Amministrazione 81|00, v28.
 //
-// Perché esiste: alcune installazioni della PWA erano rimaste agganciate a un
-// vecchio service worker che serviva dalla cache una versione sorpassata
-// dell'app, impedendo di vedere gli aggiornamenti.
+// Obiettivi:
+//  - AVVIO RAPIDO: il "guscio" dell'app (HTML, icone, librerie) può arrivare
+//    dalla cache, così l'apertura non riscarica tutto da zero ogni volta.
+//  - DATI SEMPRE FRESCHI: le chiamate a Supabase e Google non vengono mai messe
+//    in cache; passano sempre dalla rete.
+//  - AGGIORNAMENTO AUTOMATICO: quando esce una nuova versione, l'app se ne
+//    accorge e si ricarica da sola (registrazione lato pagina in index.html).
 //
-// Cosa fa: appena il browser scarica questo file come aggiornamento della
-// registrazione esistente, questo SW svuota tutte le cache, si disinstalla da
-// solo e ricarica le schede aperte. Da lì in poi l'app torna a caricarsi
-// sempre dalla rete (nessun handler fetch), quindi gli aggiornamenti arrivano
-// subito a ogni pubblicazione. L'utente non deve fare nulla a mano.
-const VERSION = 'kill-v27';
+// Strategia pagina: "network-first con timeout" — se la rete risponde entro
+// pochi secondi si usa la versione fresca; se è lenta o assente si usa la copia
+// in cache (apertura comunque rapida e funzionante offline).
+const CACHE = 'otto8100-amm-v28';
+const PRECACHE = ['./', './index.html'];
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE).catch(() => {})));
 });
 
-self.addEventListener('activate', (e) => {
+self.addEventListener('activate', e => {
   e.waitUntil((async () => {
-    // 1) svuota tutte le cache lasciate dai service worker precedenti
-    try {
-      const keys = await caches.keys();
-      await Promise.all(keys.map(k => caches.delete(k)));
-    } catch (err) {}
-    // 2) disinstalla questo service worker
-    try { await self.registration.unregister(); } catch (err) {}
-    // 3) ricarica le schede aperte → si ricaricano fresche, senza service worker
-    try {
-      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      clients.forEach(c => { try { c.navigate(c.url); } catch (err) {} });
-    } catch (err) {}
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
   })());
 });
 
-// Nessun handler 'fetch': tutte le richieste vanno direttamente in rete.
+// La pagina chiede l'attivazione immediata della nuova versione (vedi index.html).
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  // dati e servizi: sempre dalla rete, mai in cache
+  if (url.hostname.includes('supabase') || url.hostname.includes('google') ||
+      url.hostname.includes('googleapis') || url.hostname.includes('gstatic')) return;
+
+  const isPagina = e.request.mode === 'navigate' ||
+    url.pathname.endsWith('index.html') || url.pathname.endsWith('/');
+
+  if (isPagina) {
+    e.respondWith((async () => {
+      try {
+        const net = await Promise.race([
+          fetch(e.request),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 2500))
+        ]);
+        if (net && net.status === 200) {
+          const clone = net.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+          return net;
+        }
+        return (await caches.match(e.request)) || (await caches.match('./index.html')) || net;
+      } catch (err) {
+        return (await caches.match(e.request)) || (await caches.match('./index.html')) || fetch(e.request);
+      }
+    })());
+    return;
+  }
+
+  // altri file statici (icone locali, eventuali librerie CDN): stale-while-revalidate
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      const rete = fetch(e.request).then(res => {
+        if (res && res.status === 200 && res.type !== 'opaque') {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => cached);
+      return cached || rete;
+    })
+  );
+});

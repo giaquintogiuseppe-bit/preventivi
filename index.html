@@ -107,6 +107,35 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
 .list-item .li-cli{font-size:16px;font-weight:600;color:var(--text)}
 .list-item .li-imp{font-family:var(--mono);font-size:17px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
 .muted{color:var(--text2);font-size:13px}
+/* ── Collegamenti (scheda): riquadri cliccabili, stile mockup ── */
+#link-box .lk-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh1)}
+#link-box .lk-h{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+#link-box .lk-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#link-box .lk-tile{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r2);background:var(--surface-2);font-size:13px;font-weight:600;min-height:44px}
+#link-box .lk-tile.act{cursor:pointer;transition:border-color .12s}
+#link-box .lk-tile.act:hover{border-color:var(--line-strong)}
+#link-box .lk-tile .lk-ar{margin-left:auto;color:var(--text2)}
+#link-box .lk-tile.off{opacity:.6}
+#link-box .lk-tile .lk-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:560px){#link-box .lk-grid{grid-template-columns:1fr}}
+/* ── Timeline revisioni (scheda): linea verticale + nodi, stile mockup ── */
+#rev-box .rv-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh1)}
+#rev-box .rv-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+#rev-box .rv-h b{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text2)}
+#rev-box .rv-tl{position:relative;padding-left:24px;margin-top:4px}
+#rev-box .rv-tl::before{content:"";position:absolute;left:8px;top:6px;bottom:10px;width:2px;background:var(--line)}
+#rev-box .rv-item{position:relative;padding:9px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:var(--r2);background:var(--surface-2)}
+#rev-box .rv-item:last-child{margin-bottom:0}
+#rev-box .rv-item::before{content:"";position:absolute;left:-20px;top:13px;width:11px;height:11px;border-radius:50%;background:var(--surface);border:2px solid var(--line-strong)}
+#rev-box .rv-item.cur::before{background:var(--accent);border-color:var(--accent)}
+#rev-box .rv-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+#rev-box .rv-rv{font-weight:700;font-size:13px}
+#rev-box .rv-dt{font-size:11px;color:var(--text2);font-weight:400}
+#rev-box .rv-imp{font-family:var(--mono);font-weight:700;font-size:15px}
+#rev-box .rv-delta{font-family:var(--mono);font-weight:700;font-size:12px}
+#rev-box .rv-cause{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:999px;padding:2px 8px;margin-top:6px}
+#rev-box .rv-more{text-align:right;margin-top:8px}
+#rev-box .rv-more span{cursor:pointer;font-size:11px;color:var(--warn)}
 /* BARRA AZIONI del preventivo: totale + Salva + PDF sempre a portata */
 .azioni-bar{position:sticky;bottom:12px;z-index:50;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px 10px 18px;box-shadow:var(--sh2);margin:16px 0 12px}
 .azioni-tot{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
@@ -1247,35 +1276,34 @@ function renderRevBox(){
   if(!p || !revs.length){ box.style.display='none'; box.innerHTML=''; return; }
   const _imp=r=>{ if(r&&r.imponibile!=null&&isFinite(parseFloat(r.imponibile))) return parseFloat(r.imponibile);
     if(r&&Array.isArray(r.righe)&&r.righe.length) return r.righe.reduce((t,x)=>t+(parseFloat(x&&x.qta)||0)*(parseFloat(x&&x.prezzo)||0),0); return null; };
-  const t='var(--teal,#0E6B64)', g='var(--gold,#9A5B00)', t2='var(--text2,#556070)', br='var(--brd,#E1E5EA)', mono='var(--mono,ui-monospace,monospace)';
   const ultima=revs[0];
   const dLast=(ultima&&ultima.imponibile_prec!=null&&_imp(ultima)!=null)?(_imp(ultima)-parseFloat(ultima.imponibile_prec||0)):null;
   const nodi=revs.map((r,i)=>{
     const imp=_imp(r);
     const delta=(r.imponibile_prec!=null&&imp!=null)?(imp-parseFloat(r.imponibile_prec||0)):null;
-    const col=delta==null?t2:(delta>0?t:'#B42318');
+    const dcol=delta==null?'var(--text2)':(delta>0?'var(--ok)':'var(--danger)');
     const dt=r.data?new Date(r.data).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'2-digit'}):'';
-    const causa = r.tipo==='consuntivato' ? '🧾 segue il consuntivo'
-               : (r.commessa ? '🔄 commessa «'+esc(r.commessa)+'»' : 'aggiornamento ricavo');
+    let cbg='var(--accent-soft)', cfg='var(--accent)';
+    let causa;
+    if(r.tipo==='consuntivato'){ causa='🧾 segue il consuntivo'; cbg='var(--accent-soft)'; cfg='var(--accent)'; }
+    else if(r.commessa){ causa='🔄 commessa «'+esc(r.commessa)+'»'; cbg='var(--info-soft)'; cfg='var(--info)'; }
+    else { causa='aggiornamento ricavo'; cbg='var(--muted-soft)'; cfg='var(--text2)'; }
     const corr=(i===0);
-    return '<div style="position:relative;padding:8px 0 8px 18px;'+(i?'border-top:1px dashed '+br:'')+'">'
-      +'<span style="position:absolute;left:1px;top:13px;width:9px;height:9px;border-radius:50%;background:'+(corr?t:'#fff')+';border:2px solid '+(corr?t:br)+'"></span>'
-      +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">'
-        +'<span><b style="font-size:12.5px">rev.'+esc(String(r.rev))+(corr?' · attuale':'')+'</b> <span style="font-size:11px;color:'+t2+'">'+esc(dt)+'</span></span>'
-        +(imp!=null?'<span style="font-family:'+mono+';font-weight:700;font-size:13px">'+eur(imp)+'</span>':'')
-      +'</div>'
-      +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:2px">'
-        +'<span style="font-size:11px;color:'+t2+'">'+causa+(r.righe_n?' · '+r.righe_n+' voci':'')+'</span>'
-        +(delta!=null?'<span style="font-family:'+mono+';font-weight:700;font-size:12px;color:'+col+'">'+(delta>=0?'+':'')+eur(delta)+'</span>':'')
+    return '<div class="rv-item'+(corr?' cur':'')+'">'
+      +'<div class="rv-top"><span class="rv-rv">rev.'+esc(String(r.rev))+(corr?' · attuale':'')+' <span class="rv-dt">'+esc(dt)+'</span></span>'
+        +(imp!=null?'<span class="rv-imp">'+eur(imp)+'</span>':'')+'</div>'
+      +'<div class="rv-top" style="margin-top:3px">'
+        +'<span class="rv-cause" style="background:'+cbg+';color:'+cfg+'">'+causa+(r.righe_n?' · '+r.righe_n+' voci':'')+'</span>'
+        +(delta!=null?'<span class="rv-delta" style="color:'+dcol+'">'+(delta>=0?'+':'')+eur(delta)+'</span>':'')
       +'</div></div>';
   }).join('');
   box.style.display='block';
-  box.innerHTML='<div style="background:var(--card,#fff);border:1px solid '+br+';border-radius:10px;padding:12px 14px">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">'
-      +'<b style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:'+t2+'">📜 Revisioni ('+revs.length+')</b>'
-      +(dLast!=null?'<span style="font-size:11px;color:'+t2+'">ultima '+(dLast>=0?'+':'')+eur(dLast)+'</span>':'')
-    +'</div>'+nodi
-    +'<div style="margin-top:8px;text-align:right"><span onclick="apriStoricoRevisioni()" style="cursor:pointer;font-size:11px;color:'+g+'" title="Apri lo storico completo">Storico completo ›</span></div>'
+  box.innerHTML='<div class="rv-card">'
+    +'<div class="rv-h"><b>📜 Revisioni ('+revs.length+')</b>'
+      +(dLast!=null?'<span style="font-size:11px;color:var(--text2)">ultima '+(dLast>=0?'+':'')+eur(dLast)+'</span>':'')
+    +'</div>'
+    +'<div class="rv-tl">'+nodi+'</div>'
+    +'<div class="rv-more"><span onclick="apriStoricoRevisioni()" title="Apri lo storico completo">Storico completo ›</span></div>'
   +'</div>';
 }
 // Collegamenti raggruppati: preventivo · commessa · consuntivo · fatture.
@@ -1285,28 +1313,23 @@ function renderLinkBox(){
   const p=window._pAperto;
   if(!p){ box.style.display='none'; box.innerHTML=''; return; }
   const v=_vitaPrev(p);
-  const t='var(--teal,#0E6B64)', g='var(--gold,#9A5B00)', t2='var(--text2,#556070)', br='var(--brd,#E1E5EA)';
-  const chip=(ico,txt,col,onclick,title)=>'<span'+(onclick?' onclick="'+onclick+'"':'')+(title?' title="'+esc(title)+'"':'')+' style="display:inline-flex;align-items:center;gap:5px;font-size:12px;'+(onclick?'cursor:pointer;':'')+'background:var(--surface-2,#f7f8fa);border:1px solid '+br+';border-radius:999px;padding:4px 10px;color:'+(col||'var(--text,#18222f)')+'">'+ico+' '+txt+'</span>';
-  const link=(txt,onclick)=>'<span onclick="'+onclick+'" style="cursor:pointer;font-size:11px;color:'+g+'">'+txt+'</span>';
-  const row=(label,content)=>'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-top:1px dashed '+br+'">'
-    +'<span style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+t2+';min-width:84px">'+label+'</span>'+content+'</div>';
-  const commessaHtml = v.cant
-    ? chip('🏗', esc(v.cantNome||'commessa'), t, '', 'Commessa collegata')+' '+link('cambia','apriCollega()')
-    : '<span style="font-size:12px;color:'+t2+'">Nessuna</span> '+link('🔗 collega','apriCollega()');
+  const tile=(ico,lbl,opts)=>{ opts=opts||{};
+    return '<div class="lk-tile'+(opts.onclick?' act':'')+(opts.off?' off':'')+'"'
+      +(opts.onclick?' onclick="'+opts.onclick+'"':'')+(opts.title?' title="'+esc(opts.title)+'"':'')+'>'
+      +'<span>'+ico+'</span><span class="lk-lbl">'+lbl+'</span>'+(opts.onclick?'<span class="lk-ar">›</span>':'')+'</div>'; };
   const em=v._emesse||[], de=v._daEmettere||[];
-  let fattHtml;
-  if(em.length||de.length){
-    fattHtml=em.map(f=>chip('🧾', esc(f.numero||'—')+(f.stato==='pagata'?' · pagata':''), f.stato==='pagata'?t:'var(--text,#18222f)','','Fattura '+(f.stato||''))).join(' ')
-      +(de.length?' '+de.map(f=>chip('📝', esc(f.numero||'bozza')+' · da emettere', g,'','Fattura preparata, non ancora emessa')).join(' '):'');
-  } else { fattHtml='<span style="font-size:12px;color:'+t2+'">Nessuna fattura</span>'; }
+  const nF=em.length+de.length;
+  let tiles='';
+  tiles += v.cant
+    ? tile('🏗','Commessa «'+esc(v.cantNome||'—')+'»',{onclick:'apriCollega()',title:'Commessa collegata — cambia o scollega'})
+    : tile('🏗','Nessuna commessa',{onclick:'apriCollega()',title:'Collega una commessa',off:true});
+  tiles += '<div id="link-cons-tile">'+tile('📊','Consuntivo…',{off:true})+'</div>';
+  tiles += nF
+    ? tile('💶','Fatture ('+nF+')'+(de.length?' · '+de.length+' da emettere':''),{title:'Fatture collegate alla commessa'})
+    : tile('💶','Nessuna fattura',{off:true});
   box.style.display='block';
-  box.innerHTML='<div style="background:var(--card,#fff);border:1px solid '+br+';border-radius:10px;padding:8px 14px 10px">'
-    +'<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:'+t2+';font-weight:700;margin-bottom:2px">🔗 Collegamenti</div>'
-    +row('Commessa', commessaHtml)
-    +row('Consuntivo', '<span id="link-consuntivo" style="font-size:12px;color:'+t2+'">…</span>')
-    +row('Fatture', fattHtml)
-  +'</div>';
-  // Consuntivo collegato: lookup asincrono, poi riempi la riga (solo se il preventivo aperto è ancora questo).
+  box.innerHTML='<div class="lk-card"><div class="lk-h">🔗 Collegamenti</div><div class="lk-grid">'+tiles+'</div></div>';
+  // Consuntivo collegato: lookup asincrono, poi sostituisci il riquadro (solo se il preventivo aperto è ancora questo).
   (async()=>{
     let list=[];
     try{
@@ -1314,12 +1337,15 @@ function renderLinkBox(){
       list=await r.json(); if(!Array.isArray(list)) list=[];
     }catch(e){ list=null; }
     if(window._pAperto!==p) return;
-    const c2=document.getElementById('link-consuntivo'); if(!c2) return;
-    if(list===null){ c2.textContent='—'; return; }
+    const cell=document.getElementById('link-cons-tile'); if(!cell) return;
+    if(list===null){ cell.innerHTML=tile('📊','Consuntivo —',{off:true}); return; }
     if(list.length){
-      c2.outerHTML=list.map(c=>'<span onclick="apriConsuntivo(\''+c.id+'\')" title="Apri il consuntivo" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:12px;background:var(--surface-2,#f7f8fa);border:1px solid '+br+';border-radius:999px;padding:4px 10px;color:var(--text,#18222f)">📊 '+esc(c.numero||'—')+(c.stato?' · '+esc(c.stato):'')+'</span>').join(' ');
+      const c=list[0];
+      cell.innerHTML=tile('📊','Consuntivo '+esc(c.numero||'—')+(c.stato?' · '+esc(c.stato):''),{onclick:"apriConsuntivo('"+c.id+"')",title:'Apri il consuntivo'});
     } else {
-      c2.outerHTML='<span style="font-size:12px;color:'+t2+'">Nessuno</span>'+(p.stato==='accettato'?' <span onclick="creaConsuntivoDaCorrente()" style="cursor:pointer;font-size:11px;color:'+g+'">📊 crea consuntivo</span>':'');
+      cell.innerHTML = p.stato==='accettato'
+        ? tile('📊','Crea consuntivo',{onclick:'creaConsuntivoDaCorrente()',title:'Crea il consuntivo collegato'})
+        : tile('📊','Nessun consuntivo',{off:true});
     }
   })();
 }
@@ -3680,5 +3706,31 @@ init();
     </div>
   </div>
 </div>
+<script>
+// Service worker: guscio in cache per avvio rapido, dati sempre dalla rete,
+// e aggiornamento automatico — quando esce una nuova versione l'app si ricarica
+// da sola, senza che l'utente debba svuotare la cache.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+      reg.update();
+      reg.addEventListener('updatefound', function () {
+        var nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', function () {
+          // nuova versione pronta E c'è già un controller => è un aggiornamento: attivala subito
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            nw.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    }).catch(function () {});
+    var ricaricato = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (ricaricato) return; ricaricato = true; location.reload();
+    });
+  });
+}
+</script>
 </body>
 </html>
