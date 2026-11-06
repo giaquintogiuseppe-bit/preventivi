@@ -1,51 +1,35 @@
-const CACHE_NAME = 'otto8100-amministrazione-v26';
+// sw.js — SERVICE WORKER DI PULIZIA ("kill switch"), v27.
+//
+// Perché esiste: alcune installazioni della PWA erano rimaste agganciate a un
+// vecchio service worker che serviva dalla cache una versione sorpassata
+// dell'app, impedendo di vedere gli aggiornamenti.
+//
+// Cosa fa: appena il browser scarica questo file come aggiornamento della
+// registrazione esistente, questo SW svuota tutte le cache, si disinstalla da
+// solo e ricarica le schede aperte. Da lì in poi l'app torna a caricarsi
+// sempre dalla rete (nessun handler fetch), quindi gli aggiornamenti arrivano
+// subito a ogni pubblicazione. L'utente non deve fare nulla a mano.
+const VERSION = 'kill-v27';
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      // cache solo i file locali, le CDN possono fallire in offline
-      return cache.addAll(['./', './index.html']).catch(() => {});
-    })
-  );
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+self.addEventListener('activate', (e) => {
+  e.waitUntil((async () => {
+    // 1) svuota tutte le cache lasciate dai service worker precedenti
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    } catch (err) {}
+    // 2) disinstalla questo service worker
+    try { await self.registration.unregister(); } catch (err) {}
+    // 3) ricarica le schede aperte → si ricaricano fresche, senza service worker
+    try {
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      clients.forEach(c => { try { c.navigate(c.url); } catch (err) {} });
+    } catch (err) {}
+  })());
 });
 
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  const url = new URL(e.request.url);
-  if (url.hostname.includes('supabase') || url.hostname.includes('google') || url.hostname.includes('googleapis')) return;
-  const isPagina = e.request.mode === 'navigate' || url.pathname.endsWith('index.html') || url.pathname.endsWith('/');
-  if (isPagina) {
-    e.respondWith(
-      fetch(e.request).then(res => {
-        if (res && res.status === 200) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => caches.match(e.request))
-    );
-    return;
-  }
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const networkFetch = fetch(e.request).then(res => {
-        if (res && res.status === 200 && res.type !== 'opaque') {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => cached);
-      return cached || networkFetch;
-    })
-  );
-});
+// Nessun handler 'fetch': tutte le richieste vanno direttamente in rete.
