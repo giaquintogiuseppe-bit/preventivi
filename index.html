@@ -481,6 +481,9 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
     <!-- Revisioni in evidenza: timeline inline (legge p.revisioni, additiva) -->
     <div id="rev-box" style="display:none;margin-bottom:12px"></div>
 
+    <!-- Collegamenti raggruppati: commessa · consuntivo · fatture (additivo, sola lettura+azioni esistenti) -->
+    <div id="link-box" style="display:none;margin-bottom:12px"></div>
+
     <!-- barra azioni sempre visibile in basso: totale + Salva + PDF -->
     <div class="azioni-bar">
       <div class="azioni-tot"><span>Totale</span><b id="t-totale-bar">€ 0,00</b></div>
@@ -1275,6 +1278,51 @@ function renderRevBox(){
     +'<div style="margin-top:8px;text-align:right"><span onclick="apriStoricoRevisioni()" style="cursor:pointer;font-size:11px;color:'+g+'" title="Apri lo storico completo">Storico completo ›</span></div>'
   +'</div>';
 }
+// Collegamenti raggruppati: preventivo · commessa · consuntivo · fatture.
+// Additivo: sola lettura + azioni già esistenti (apriCollega / apriConsuntivo / creaConsuntivoDaCorrente).
+function renderLinkBox(){
+  const box=document.getElementById('link-box'); if(!box) return;
+  const p=window._pAperto;
+  if(!p){ box.style.display='none'; box.innerHTML=''; return; }
+  const v=_vitaPrev(p);
+  const t='var(--teal,#0E6B64)', g='var(--gold,#9A5B00)', t2='var(--text2,#556070)', br='var(--brd,#E1E5EA)';
+  const chip=(ico,txt,col,onclick,title)=>'<span'+(onclick?' onclick="'+onclick+'"':'')+(title?' title="'+esc(title)+'"':'')+' style="display:inline-flex;align-items:center;gap:5px;font-size:12px;'+(onclick?'cursor:pointer;':'')+'background:var(--surface-2,#f7f8fa);border:1px solid '+br+';border-radius:999px;padding:4px 10px;color:'+(col||'var(--text,#18222f)')+'">'+ico+' '+txt+'</span>';
+  const link=(txt,onclick)=>'<span onclick="'+onclick+'" style="cursor:pointer;font-size:11px;color:'+g+'">'+txt+'</span>';
+  const row=(label,content)=>'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-top:1px dashed '+br+'">'
+    +'<span style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+t2+';min-width:84px">'+label+'</span>'+content+'</div>';
+  const commessaHtml = v.cant
+    ? chip('🏗', esc(v.cantNome||'commessa'), t, '', 'Commessa collegata')+' '+link('cambia','apriCollega()')
+    : '<span style="font-size:12px;color:'+t2+'">Nessuna</span> '+link('🔗 collega','apriCollega()');
+  const em=v._emesse||[], de=v._daEmettere||[];
+  let fattHtml;
+  if(em.length||de.length){
+    fattHtml=em.map(f=>chip('🧾', esc(f.numero||'—')+(f.stato==='pagata'?' · pagata':''), f.stato==='pagata'?t:'var(--text,#18222f)','','Fattura '+(f.stato||''))).join(' ')
+      +(de.length?' '+de.map(f=>chip('📝', esc(f.numero||'bozza')+' · da emettere', g,'','Fattura preparata, non ancora emessa')).join(' '):'');
+  } else { fattHtml='<span style="font-size:12px;color:'+t2+'">Nessuna fattura</span>'; }
+  box.style.display='block';
+  box.innerHTML='<div style="background:var(--card,#fff);border:1px solid '+br+';border-radius:10px;padding:8px 14px 10px">'
+    +'<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:'+t2+';font-weight:700;margin-bottom:2px">🔗 Collegamenti</div>'
+    +row('Commessa', commessaHtml)
+    +row('Consuntivo', '<span id="link-consuntivo" style="font-size:12px;color:'+t2+'">…</span>')
+    +row('Fatture', fattHtml)
+  +'</div>';
+  // Consuntivo collegato: lookup asincrono, poi riempi la riga (solo se il preventivo aperto è ancora questo).
+  (async()=>{
+    let list=[];
+    try{
+      const r=await fetch(SB_URL+'/rest/v1/consuntivi?select=id,numero,stato,data&preventivo_numero=eq.'+encodeURIComponent(p.numero||'')+'&order=data.desc',{headers:SB_H,cache:'no-cache'});
+      list=await r.json(); if(!Array.isArray(list)) list=[];
+    }catch(e){ list=null; }
+    if(window._pAperto!==p) return;
+    const c2=document.getElementById('link-consuntivo'); if(!c2) return;
+    if(list===null){ c2.textContent='—'; return; }
+    if(list.length){
+      c2.outerHTML=list.map(c=>'<span onclick="apriConsuntivo(\''+c.id+'\')" title="Apri il consuntivo" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:12px;background:var(--surface-2,#f7f8fa);border:1px solid '+br+';border-radius:999px;padding:4px 10px;color:var(--text,#18222f)">📊 '+esc(c.numero||'—')+(c.stato?' · '+esc(c.stato):'')+'</span>').join(' ');
+    } else {
+      c2.outerHTML='<span style="font-size:12px;color:'+t2+'">Nessuno</span>'+(p.stato==='accettato'?' <span onclick="creaConsuntivoDaCorrente()" style="cursor:pointer;font-size:11px;color:'+g+'">📊 crea consuntivo</span>':'');
+    }
+  })();
+}
 function renderStoricoRevisioni(){
   const p=window._pAperto; const cont=document.getElementById('revisioni-lista'); if(!cont) return;
   const revs=(Array.isArray(p&&p.revisioni)?p.revisioni:[]).slice().sort((a,b)=>(b.rev||0)-(a.rev||0));
@@ -1705,6 +1753,7 @@ async function nuovoPreventivo(){
   const bco=document.getElementById('btn-consuntivo'); if(bco) bco.style.display='none';
   const vb=document.getElementById('vita-box'); if(vb) vb.style.display='none';
   const rb=document.getElementById('rev-box'); if(rb){ rb.style.display='none'; rb.innerHTML=''; }
+  const lb=document.getElementById('link-box'); if(lb){ lb.style.display='none'; lb.innerHTML=''; }
   vista('editor'); setModalita('dettagliata');
   document.getElementById('cli-select').value='';
   ['p-cliente','p-cliente-ind','p-cliente-piva','p-cliente-rif','p-rif','p-oggetto','p-intro','p-materiali','p-corpo-desc','p-corpo-imp'].forEach(id=>document.getElementById(id).value='');
@@ -2289,7 +2338,7 @@ function _vitaPrev(p){
   const daEmettere = mie.filter(f=>f.stato==='da_emettere');
   const fatt = emesse.length>0;
   const pagata = emesse.length>0 && emesse.every(f=>f.stato==='pagata');
-  return {acc, cant:!!cant, chiuso, fatt, pagata, daEmettere:daEmettere.length, cantNome:cant?cant.nome:null, manuale:!!p.cantiere_id};
+  return {acc, cant:!!cant, chiuso, fatt, pagata, daEmettere:daEmettere.length, cantNome:cant?cant.nome:null, manuale:!!p.cantiere_id, _cant:cant, _emesse:emesse, _daEmettere:daEmettere};
 }
 // Stato del preventivo scritto in chiaro, con il codice colori del design system v2
 // (stessa logica della frase nel box "Vita del lavoro").
@@ -2366,6 +2415,7 @@ function renderVitaBox(){
     +'<span onclick="apriCollega()" style="cursor:pointer;font-size:11px;color:var(--gold,#9A5B00)">🔗 '+(v.manuale?'cantiere collegato a mano':'collega cantiere')+'</span>'
     +_vitaAzioniCommessa(p,v);
   try{ renderRevBox(); }catch(e){}
+  try{ renderLinkBox(); }catch(e){}
 }
 // Azioni commessa nel box "vita del lavoro": pulsante "Aggiorna commessa" (solo se
 // accettato + cantiere collegato) e link allo storico revisioni.
@@ -2482,13 +2532,15 @@ function _renderChipsLista(){
     return '<span onclick="filtraStato(\''+v+'\')" style="cursor:pointer;font-size:13px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid '+(on?'var(--text,#18222f)':'var(--line-strong,#cbd2da)')+';background:'+(on?'var(--text,#18222f)':'var(--surface,#fff)')+';color:'+(on?'var(--surface,#fff)':'var(--text2,#556070)')+'">'+l+'</span>';
   }).join('');
 }
+function _revBadge(p){ const n=(p.revisioni&&p.revisioni.length)||parseInt(p.rev,10)||0; return n>0?'<span style="font-size:11px;font-weight:600;color:var(--gold,#9A5B00);background:var(--warn-soft,#fbefd9);border:1px solid var(--gold,#9A5B00);border-radius:999px;padding:2px 8px">📜 rev.'+n+'</span>':''; }
+function _ricontattaBadge(p){ if((p.stato||'')!=='inviato') return ''; const d=p.data?Date.parse(p.data):NaN; return (isFinite(d)&&(Date.now()-d)>30*864e5)?'<span style="font-size:11px;font-weight:700;color:var(--gold,#9A5B00);background:var(--warn-soft,#fbefd9);border:1px solid var(--gold,#9A5B00);border-radius:999px;padding:2px 8px">⚠ da ricontattare</span>':''; }
 function renderLista(){
   const q=(document.getElementById('cerca-prev').value||'').toLowerCase();
   const f=LISTA.filter(p=>_matchStato(p)&&(!q||((p.numero||'')+(p.cliente_nome||'')+(p.oggetto||'')).toLowerCase().includes(q)));
   _renderKpiLista(); _renderChipsLista();
   document.getElementById('lista-prev').innerHTML=f.length?f.map(p=>`
     <div class="list-item" onclick="apriPreventivo(${p.id})">
-      <div style="min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px"><span class="li-num">${esc(p.numero)}</span>${_statoPrevBadge(p)}</div>
+      <div style="min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px"><span class="li-num">${esc(p.numero)}</span>${_statoPrevBadge(p)}${_revBadge(p)}${_ricontattaBadge(p)}</div>
       <div class="li-cli">${esc(p.cliente_nome||'—')}</div><div class="muted">${esc((p.oggetto||'').slice(0,90))}</div>
       <div style="margin-top:6px">${_vitaHTML(p,true)}</div></div>
       <div style="text-align:right;flex-shrink:0"><div class="li-imp">${eur(p.totale)}</div><div class="muted">${p.data?new Date(p.data).toLocaleDateString('it-IT'):''}</div></div>
