@@ -15,56 +15,145 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* Tema istituzionale Ottantunocento — chiaro, alta leggibilità (IBM Plex).
-   I nomi delle variabili sono mantenuti perché usati anche negli stili inline. */
-:root{--navy:#f4f1ea;--navy2:#ece7db;--card:#ffffff;--brd:#e4dfd3;--text:#1b2740;--text2:#5f6a7d;--teal:#0e6b64;--teal2:#0b544f;--gold:#b98a2e;--red:#b0413f;--green:#2f8f6f;--r:14px;--r2:9px}
+/* ═══ DESIGN SYSTEM 81|00 v2 (nov 2026) — lo stesso del Planning ═══════════
+   Pochi colori, ognuno con un significato. Verde acqua = azione principale e voce attiva.
+   Stati: ok=accettato/saldato · info=in lavorazione · warn=in attesa/da fatturare
+   · danger=annullato/perso · muted=bozza. Il PDF per il cliente ha uno stile suo (CI_CSS).
+   I vecchi nomi (--navy, --teal, --gold…) restano come alias: sono usati negli stili inline. */
+:root{
+  --bg:#f2f4f6;--surface:#ffffff;--surface-2:#f7f8fa;--line:#e1e5ea;--line-strong:#cbd2da;
+  --text:#18222f;--text2:#556070;
+  --accent:#0e6b64;--accent-hover:#0a524d;--accent-soft:#e3f1ef;--accent-softer:#f1f8f7;
+  --ok:#276b43;--ok-soft:#e5f2ea;--info:#2556a8;--info-soft:#e6eefa;
+  --warn:#9a5b00;--warn-soft:#fbefd9;--danger:#b42318;--danger-soft:#fce8e6;--danger-line:#f1b5ae;
+  --muted:#556070;--muted-soft:#edf0f3;
+  --sh1:0 1px 2px rgba(16,24,40,.06);--sh2:0 12px 32px rgba(16,24,40,.14);
+  --r:10px;--r2:6px;--r3:16px;--mono:'IBM Plex Mono',ui-monospace,monospace;
+  --navy:var(--bg);--navy2:var(--surface-2);--card:var(--surface);--brd:var(--line);
+  --teal:var(--accent);--teal2:var(--accent-hover);--gold:var(--warn);--red:var(--danger);--green:var(--ok)
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--navy);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1040px;margin:0 auto;padding:16px}
-.top{display:flex;align-items:center;gap:12px;padding:16px 0;border-bottom:1px solid var(--brd);margin-bottom:20px}
-.top h1{font-family:'IBM Plex Serif',serif;font-size:23px;font-weight:600;letter-spacing:-.01em;color:var(--text)}
-.top .sub{font-size:12px;color:var(--text2)}
-.btn{background:var(--teal);color:#fff;border:none;border-radius:var(--r2);padding:10px 17px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
-.btn:hover{background:var(--teal2)}
-.bs{background:#fff;color:var(--text);border:1px solid var(--brd);border-radius:var(--r2);padding:10px 15px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
-.bs:hover{border-color:var(--teal);color:var(--teal)}
-.bd{background:#fff;border:1px solid #e2b6b4;color:var(--red);border-radius:var(--r2);padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
-.bd:hover{background:#fbf1f0}
-.card{background:var(--card);border:1px solid var(--brd);border-radius:var(--r);padding:20px 22px;margin-bottom:14px}
-.attr-riga{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 40px;gap:8px;align-items:center;margin-bottom:6px}
-.attr-st{display:inline-block;margin-top:2px;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:rgba(185,138,46,.14);color:var(--gold)}
-.attr-ext{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-2px 0 4px;padding:7px 10px;border-radius:var(--r2);background:rgba(14,107,100,.06);font-size:12px}
-.attr-ext select,.attr-ext input{width:auto;min-width:180px;padding:6px 8px;font-size:12px}
-.attr-ext-todo{background:rgba(176,65,63,.08);border:1px dashed var(--red)}
-.attr-in_corso{background:rgba(14,107,100,.12);color:var(--teal)}.attr-rientrata{background:rgba(47,143,111,.12);color:var(--green)}
-@media(max-width:560px){.attr-riga{grid-template-columns:minmax(0,1fr) 60px 36px}.attr-riga>div.muted:nth-child(3){grid-column:1/-1;order:5}}
-.card h2{font-family:'IBM Plex Serif',serif;font-size:16px;font-weight:600;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:9px}
-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);font-weight:600;margin-bottom:5px}
-input,select,textarea{width:100%;background:#faf8f3;border:1px solid var(--brd);border-radius:var(--r2);color:var(--text);font-family:inherit;font-size:14px;padding:10px 11px;outline:none;transition:border-color .12s,box-shadow .12s}
-input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(14,107,100,.13);background:#fff}
-::placeholder{color:#9aa2b0}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+body{font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ico{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px 24px}
+/* INTESTAZIONE: titolo, sezioni (quella attiva evidenziata), nuovo preventivo */
+.top{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;padding:20px 0 16px;margin-bottom:8px}
+.top-tit{flex:1 1 260px;min-width:0}
+.top h1{font-size:22px;font-weight:700;letter-spacing:-.01em;color:var(--text);line-height:1.2}
+.top .sub{font-size:13px;color:var(--text2)}
+.top-az{display:flex;align-items:center;gap:8px}
+.nav-v{order:3;flex:1 1 100%;display:flex;gap:2px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px;box-shadow:var(--sh1)}
+.nv{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 14px;border:none;border-radius:var(--r2);background:transparent;color:var(--text2);font-family:inherit;font-size:14px;font-weight:500;cursor:pointer}
+.nv:hover{background:var(--surface-2);color:var(--text)}
+.nv.on{background:var(--accent-soft);color:var(--accent-hover);font-weight:600}
+.nv-esci{margin-left:auto}
+/* PULSANTI: uno pieno (.btn) per azione principale, gli altri bordati */
+.btn,.bs,.bd{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border-radius:var(--r2);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s}
+.btn{background:var(--accent);color:#fff;border:1px solid var(--accent)}
+.btn:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.bs{background:var(--surface);color:var(--text);border:1px solid var(--line-strong)}
+.bs:hover{background:var(--surface-2)}
+.bd{background:var(--surface);border:1px solid var(--danger-line);color:var(--danger);min-height:36px;padding:0 12px}
+.bd:hover{background:var(--danger-soft)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px;margin-bottom:16px;box-shadow:var(--sh1)}
+.attr-riga{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 40px;gap:8px;align-items:center;margin-bottom:8px}
+.attr-st{display:inline-block;margin-top:2px;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--warn-soft);color:var(--warn)}
+.attr-ext{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-2px 0 4px;padding:8px 12px;border-radius:var(--r2);background:var(--accent-softer);font-size:13px}
+.attr-ext select,.attr-ext input{width:auto;min-width:180px;padding:6px 8px;font-size:13px;min-height:36px}
+.attr-ext-todo{background:var(--danger-soft);border:1px dashed var(--danger)}
+.attr-in_corso{background:var(--info-soft);color:var(--info)}.attr-rientrata{background:var(--ok-soft);color:var(--ok)}
+@media(max-width:560px){.attr-riga{grid-template-columns:minmax(0,1fr) 60px 40px}.attr-riga>div.muted:nth-child(3){grid-column:1/-1;order:5}}
+.card h2{font-size:18px;font-weight:600;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px;line-height:1.3}
+label{display:block;font-size:13px;color:var(--text);font-weight:600;margin-bottom:6px}
+input,select,textarea{width:100%;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r2);color:var(--text);font-family:inherit;font-size:15px;min-height:42px;padding:9px 12px;outline:none;transition:border-color .12s,box-shadow .12s}
+textarea{line-height:1.45}
+input[type=checkbox],input[type=radio]{width:auto;min-height:0}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input[readonly]{background:var(--surface-2)}
+::placeholder{color:#7b8492}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
-.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .fg .full{grid-column:1/-1}
 table{width:100%;border-collapse:collapse}
-th,td{text-align:left;padding:9px 8px;font-size:12.5px;border-bottom:1px solid var(--brd)}
-th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08em;font-family:'IBM Plex Mono',monospace;font-weight:600}
-.mn{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;text-align:right}
-.tabs{display:inline-flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;background:#f0ede4;border:1px solid var(--brd);border-radius:var(--r2);padding:4px}
-.tab{background:transparent;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer}
-.tab.on{background:#152238;color:#fff;font-weight:600}
-.riga-voce{display:grid;grid-template-columns:1fr 70px 100px 100px 32px;gap:6px;align-items:center;margin-bottom:6px}
-.tot-box{background:#faf8f3;border:1px solid var(--brd);border-radius:var(--r2);padding:14px 16px;margin-top:10px}
-.tot-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13.5px}
-.tot-row.big{font-family:'IBM Plex Serif',serif;font-size:18px;font-weight:700;color:#152238;border-top:1px solid var(--brd);margin-top:8px;padding-top:10px}
-.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#152238;color:#fff;border:1px solid var(--teal);border-radius:var(--r2);padding:12px 20px;font-size:13px;z-index:9999;opacity:0;transition:.3s;box-shadow:0 12px 30px rgba(21,34,56,.28)}
+th,td{text-align:left;padding:10px 12px;font-size:14px;border-bottom:1px solid var(--line)}
+th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)}
+.mn{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+/* scelta "Righe dettagliate / Fornitura a corpo" */
+.tabs{display:inline-flex;gap:2px;margin-bottom:16px;flex-wrap:wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:4px}
+.tab{background:transparent;border:none;border-radius:var(--r2);min-height:36px;display:inline-flex;align-items:center;padding:0 16px;font-size:14px;font-weight:500;color:var(--text2);cursor:pointer}
+.tab.on{background:var(--surface);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(16,24,40,.12)}
+.riga-voce{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 120px 40px;gap:8px;align-items:center;margin-bottom:8px}
+.riga-voce.muted{font-size:12px;font-weight:600;margin-bottom:6px}
+.tot-box{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:16px 20px;margin-top:12px}
+.tot-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:4px 0;font-size:15px}
+.tot-row.big{font-size:20px;font-weight:700;color:var(--text);border-top:1px solid var(--line-strong);margin-top:8px;padding-top:12px}
+.tot-row.big .mn{font-size:22px;font-weight:600}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+/* BADGE di stato: stessi colori del Planning; .st aggiunge il pallino con la forma dello stato */
+.bx{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;line-height:1.5;white-space:nowrap}
+.bx.bg{background:var(--ok-soft);color:var(--ok)}.bx.bi{background:var(--info-soft);color:var(--info)}
+.bx.bo{background:var(--warn-soft);color:var(--warn)}.bx.br{background:var(--danger-soft);color:var(--danger)}
+.bx.bz{background:var(--muted-soft);color:var(--muted)}
+.bx.st::before{content:'';width:7px;height:7px;flex-shrink:0;background:currentColor;border-radius:50%}
+.bx.st.bo::before{border-radius:2px}.bx.st.br::before{border-radius:0;transform:rotate(45deg) scale(.9)}
+.bx.st.bz::before{background:transparent;border:1.5px solid currentColor;box-sizing:border-box}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;border:none;border-radius:8px;padding:12px 18px;font-size:14px;font-weight:600;z-index:9999;opacity:0;transition:.25s;box-shadow:var(--sh2);max-width:calc(100vw - 32px)}
 .toast.show{opacity:1}
-.list-item{background:#fff;border:1px solid var(--brd);border-radius:var(--r2);padding:11px 13px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color .12s}
-.list-item:hover{border-color:var(--teal)}
-.muted{color:var(--text2);font-size:12px}
-@media(max-width:640px){.grid2,.fg{grid-template-columns:1fr}.riga-voce{grid-template-columns:1fr 50px 80px 80px 28px}}
+.list-item{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 20px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;transition:border-color .12s,box-shadow .12s;box-shadow:var(--sh1)}
+.list-item:hover{border-color:var(--line-strong);box-shadow:0 4px 12px rgba(16,24,40,.08)}
+.list-item .li-num{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text2)}
+.list-item .li-cli{font-size:16px;font-weight:600;color:var(--text)}
+.list-item .li-imp{font-family:var(--mono);font-size:17px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.muted{color:var(--text2);font-size:13px}
+/* BARRA AZIONI del preventivo: totale + Salva + PDF sempre a portata */
+.azioni-bar{position:sticky;bottom:12px;z-index:50;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px 10px 18px;box-shadow:var(--sh2);margin:16px 0 12px}
+.azioni-tot{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.azioni-tot span{font-size:12px;font-weight:600;color:var(--text2)}
+.azioni-tot b{font-family:var(--mono);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.azioni-altre{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px}
+/* BARRA IN BASSO (solo telefono) */
+#bnav{display:none}
+.altro-lista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:16px}
+.altro-lista .nv{min-height:52px;border:1px solid var(--line);justify-content:flex-start;color:var(--text);font-size:15px}
+#foglio-altro{display:none;position:fixed;inset:0;z-index:2000;background:rgba(16,24,40,.45);align-items:flex-end;justify-content:center}
+#foglio-altro.open{display:flex}
+#foglio-altro .fa-box{background:var(--surface);width:100%;max-width:480px;border-radius:var(--r3) var(--r3) 0 0;box-shadow:var(--sh2);padding-bottom:env(safe-area-inset-bottom)}
+#foglio-altro .fa-h{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 12px 20px;border-bottom:1px solid var(--line);font-size:17px;font-weight:600}
+/* il tasto Esci del login va nel menu (intestazione su computer, "Altro" su telefono) */
+#l81out{display:none !important}
+@media(max-width:640px){
+  body{font-size:16px}
+  .wrap{padding:0 16px calc(88px + env(safe-area-inset-bottom))}
+  .top{padding:14px 0 8px}
+  .top h1{font-size:19px}
+  .top{flex-wrap:nowrap}
+  .top-tit{flex:1 1 auto}
+  .top .lbl-l{display:none}
+  .top .sub{display:none}
+  .nav-v{display:none}
+  .grid2,.fg{grid-template-columns:1fr}
+  .card{padding:18px 16px}
+  input,select,textarea{font-size:16px;min-height:44px}
+  .btn,.bs{min-height:44px;font-size:15px}
+  /* voci: ogni riga diventa una piccola scheda, descrizione intera sopra */
+  .riga-voce{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.3fr) 44px;gap:8px}
+  .riga-voce>:first-child{grid-column:1/-1}
+  .riga-voce:not(.muted){background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:10px}
+  .riga-voce .bd{min-height:44px;padding:0}
+  .riga-voce .mn{text-align:right;font-size:14px !important}
+  .list-item{flex-direction:column;align-items:stretch;gap:8px;padding:14px 16px}
+  .list-item>div:last-child{text-align:left !important;display:flex;justify-content:space-between;align-items:baseline}
+  .azioni-bar{bottom:calc(72px + env(safe-area-inset-bottom));padding:8px 8px 8px 14px;gap:8px}
+  .azioni-bar .lbl-l{display:none}
+  .azioni-tot b{font-size:18px}
+  #bnav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:1000;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  .bn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:60px;padding:6px 2px;border:none;border-top:2px solid transparent;background:none;font-family:inherit;font-size:11px;font-weight:500;color:var(--text2);cursor:pointer}
+  .bn .ico{width:22px;height:22px}
+  .bn.on{color:var(--accent);border-top-color:var(--accent);font-weight:600}
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+}
 </style>
 <!-- ═══════════════════════════════════════════════════════════════════════
      81|00 — Modulo di LOGIN unico per le app (da incollare nell'<head>,
@@ -262,16 +351,33 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
 
 </head>
 <body>
+<!-- ICONE (design system v2): disegnate a tratto, uguali su ogni telefono. Uso: <svg class="ico"><use href="#i-prev"/></svg> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-rich" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-cons" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16v-4M12 16V8M17 16v-7"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></symbol>
+  <symbol id="i-mod" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-ref" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-altro" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="i-esci" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></symbol>
+  <symbol id="i-salva" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="m9 13 2 2 4-4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
 <div class="wrap">
   <div class="top">
-    <div style="flex:1"><h1>🗂 Amministrazione 81|00</h1><div class="sub">OTTANTUNOCENTO S.R.L. · preventivi · consuntivi · documenti</div></div>
-    <button class="bs" onclick="vista('richieste')">📥 Richieste</button>
-    <button class="bs" onclick="vista('lista')">📁 Preventivi</button>
-    <button class="bs" onclick="vista('consarchivio')">📊 Consuntivi</button>
-    <button class="bs" onclick="vista('docarchivio')">🗂 Documenti</button>
-    <button class="bs" onclick="vista('modifiche')">🕘 Modifiche</button>
-    <button class="bs" onclick="vista('referenti')">🔗 Referenti</button>
-    <button class="btn" onclick="nuovoPreventivo()">+ Nuovo prev.</button>
+    <div class="top-tit"><h1>Amministrazione 81|00</h1><div class="sub">OTTANTUNOCENTO S.R.L. · preventivi · consuntivi · documenti</div></div>
+    <div class="top-az"><button class="btn" onclick="nuovoPreventivo()"><svg class="ico"><use href="#i-plus"/></svg><span>Nuovo<span class="lbl-l"> preventivo</span></span></button></div>
+    <nav class="nav-v" aria-label="Sezioni">
+      <button class="nv" data-v="richieste" onclick="vista('richieste')"><svg class="ico"><use href="#i-rich"/></svg>Richieste</button>
+      <button class="nv" data-v="lista" onclick="vista('lista')"><svg class="ico"><use href="#i-prev"/></svg>Preventivi</button>
+      <button class="nv" data-v="consarchivio" onclick="vista('consarchivio')"><svg class="ico"><use href="#i-cons"/></svg>Consuntivi</button>
+      <button class="nv" data-v="docarchivio" onclick="vista('docarchivio')"><svg class="ico"><use href="#i-doc"/></svg>Documenti</button>
+      <button class="nv" data-v="modifiche" onclick="vista('modifiche')"><svg class="ico"><use href="#i-mod"/></svg>Modifiche</button>
+      <button class="nv" data-v="referenti" onclick="vista('referenti')"><svg class="ico"><use href="#i-ref"/></svg>Referenti</button>
+      <button class="nv nv-esci" onclick="esciApp()"><svg class="ico"><use href="#i-esci"/></svg>Esci</button>
+    </nav>
   </div>
 
   <!-- VISTA REFERENTI (Rapporti) -->
@@ -292,7 +398,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
         <select id="cli-select" onchange="selezionaCliente()" style="flex:1;min-width:200px"><option value="">— Scegli dall'archivio o compila sotto —</option></select>
         <button class="bs" onclick="salvaClienteNuovo()">💾 Salva questo cliente</button>
       </div>
-      <div id="cli-ref-info" style="display:none;font-size:12px;margin:-2px 0 10px;padding:6px 10px;border-radius:8px;background:rgba(0,180,166,.1);border:1px solid rgba(0,180,166,.3);color:var(--teal)"></div>
+      <div id="cli-ref-info" style="display:none;font-size:12px;margin:-2px 0 10px;padding:6px 10px;border-radius:8px;background:rgba(14,107,100,.1);border:1px solid rgba(14,107,100,.3);color:var(--teal)"></div>
       <div class="fg">
         <div class="full"><label>Denominazione / Ente</label><input id="p-cliente" placeholder="Es. Comune di Cellole"></div>
         <div class="full"><label>Indirizzo</label><input id="p-cliente-ind" placeholder="Via..., CAP Città (PR)"></div>
@@ -343,7 +449,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
         <div class="tot-row"><span>Imponibile</span><span class="mn" id="t-imponibile">€ 0,00</span></div>
         <div class="tot-row"><span id="t-iva-lbl">IVA 22%</span><span class="mn" id="t-iva">€ 0,00</span></div>
         <div class="tot-row big"><span id="t-tot-lbl">TOTALE</span><span class="mn" id="t-totale">€ 0,00</span></div>
-        <div class="tot-row" id="t-split-row" style="display:none;color:#b8860b;font-weight:800"><span id="t-split-lbl">A tuo carico (split payment)</span><span class="mn" id="t-split">€ 0,00</span></div>
+        <div class="tot-row" id="t-split-row" style="display:none;color:#9A5B00;font-weight:800"><span id="t-split-lbl">A tuo carico (split payment)</span><span class="mn" id="t-split">€ 0,00</span></div>
       </div>
     </div>
 
@@ -370,14 +476,18 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
       </div>
     </div>
 
-    <div id="vita-box" style="display:none;align-items:center;gap:10px;margin-bottom:12px;background:var(--card,#152438);border:1px solid var(--brd,#24344d);border-radius:10px;padding:9px 14px;font-size:12px"></div>
+    <div id="vita-box" style="display:none;align-items:center;gap:10px;margin-bottom:12px;background:var(--card,#FFFFFF);border:1px solid var(--brd,#E1E5EA);border-radius:10px;padding:9px 14px;font-size:12px"></div>
 
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:30px">
-      <button class="btn" onclick="generaPDF()">📄 Genera PDF</button>
-      <button class="bs" onclick="salvaPreventivo()">☁ Salva in archivio</button>
+    <!-- barra azioni sempre visibile in basso: totale + Salva + PDF -->
+    <div class="azioni-bar">
+      <div class="azioni-tot"><span>Totale</span><b id="t-totale-bar">€ 0,00</b></div>
+      <button class="bs" onclick="salvaPreventivo()"><svg class="ico"><use href="#i-salva"/></svg><span>Salva<span class="lbl-l"> in archivio</span></span></button>
+      <button class="btn" onclick="generaPDF()"><svg class="ico"><use href="#i-pdf"/></svg><span><span class="lbl-l">Genera </span>PDF</span></button>
+    </div>
+    <div class="azioni-altre">
       <button class="bs" onclick="inviaMail()">✉ Invia via mail</button>
-      <button class="bs" id="btn-cantiere" style="display:none;background:var(--green);color:#04222b;border-color:var(--green)" onclick="apriModalCantiere()">🏗 Crea commessa</button>
-      <button class="bs" id="btn-consuntivo" style="display:none;background:var(--gold,#C9A227);color:#1a1200;border-color:var(--gold,#C9A227)" onclick="creaConsuntivoDaCorrente()" title="Crea il consuntivo finale di questo lavoro, collegato al preventivo e alla commessa">📊 Crea consuntivo</button>
+      <button class="bs" id="btn-cantiere" style="display:none;background:var(--green);color:#FFFFFF;border-color:var(--green)" onclick="apriModalCantiere()">🏗 Crea commessa</button>
+      <button class="bs" id="btn-consuntivo" style="display:none;background:var(--gold,#9A5B00);color:#FFFFFF;border-color:var(--gold,#9A5B00)" onclick="creaConsuntivoDaCorrente()" title="Crea il consuntivo finale di questo lavoro, collegato al preventivo e alla commessa">📊 Crea consuntivo</button>
       <div style="flex:1"></div>
       <button class="bd" id="btn-elimina" style="display:none" onclick="eliminaPreventivo()">🗑 Elimina</button>
     </div>
@@ -485,10 +595,10 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
         </div>
       </div>
     </div>
-    <div id="mc-avviso" style="display:none;margin-top:12px;padding:9px 12px;border-radius:var(--r2);background:rgba(201,162,39,.15);border:1px solid var(--gold);color:var(--gold);font-size:12px"></div>
+    <div id="mc-avviso" style="display:none;margin-top:12px;padding:9px 12px;border-radius:var(--r2);background:rgba(154,91,0,.15);border:1px solid var(--gold);color:var(--gold);font-size:12px"></div>
     <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
       <button class="bs" onclick="chiudiModalCantiere()">Annulla</button>
-      <button class="btn" style="background:var(--green);color:#04222b" onclick="confermaGeneraCantiere()">🏗 Crea commessa</button>
+      <button class="btn" style="background:var(--green);color:#FFFFFF" onclick="confermaGeneraCantiere()">🏗 Crea commessa</button>
     </div>
   </div>
 </div>
@@ -580,7 +690,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
       <select id="d-cli-select" onchange="selezionaClienteDoc()" style="flex:1;min-width:200px"><option value="">— Scegli dall'archivio o compila sotto —</option></select>
       <button class="bs" onclick="apriPickerPreventivo('documento')">🔗 Collega a preventivo/commessa</button>
     </div>
-    <div id="d-link" style="display:none;font-size:12px;margin-bottom:10px;padding:6px 10px;border-radius:8px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.35);color:var(--gold,#C9A227)"></div>
+    <div id="d-link" style="display:none;font-size:12px;margin-bottom:10px;padding:6px 10px;border-radius:8px;background:rgba(154,91,0,.12);border:1px solid rgba(154,91,0,.35);color:var(--gold,#9A5B00)"></div>
     <div class="fg">
       <div class="full"><label>Denominazione / Ente</label><input id="d-dest" placeholder="Es. Comune di Cellole"></div>
       <div class="full"><label>Indirizzo</label><input id="d-dest-ind" placeholder="Via..., CAP Città (PR)"></div>
@@ -657,7 +767,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
         <button class="btn" onclick="nuovoConsuntivo()">➕ Nuovo</button>
       </div>
     </div>
-    <div id="cons-link" style="display:none;font-size:12px;margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.35);color:var(--gold,#C9A227)"></div>
+    <div id="cons-link" style="display:none;font-size:12px;margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(154,91,0,.12);border:1px solid rgba(154,91,0,.35);color:var(--gold,#9A5B00)"></div>
   </div>
 
   <div class="card">
@@ -717,7 +827,7 @@ th{color:var(--text2);text-transform:uppercase;font-size:10px;letter-spacing:.08
       <div class="tot-row"><span>Imponibile</span><span class="mn" id="c-t-imponibile">€ 0,00</span></div>
       <div class="tot-row"><span id="c-t-iva-lbl">IVA 22%</span><span class="mn" id="c-t-iva">€ 0,00</span></div>
       <div class="tot-row big"><span id="c-t-tot-lbl">TOTALE</span><span class="mn" id="c-t-totale">€ 0,00</span></div>
-      <div class="tot-row" id="c-t-split-row" style="display:none;color:#b8860b;font-weight:800"><span>A carico cliente (split payment)</span><span class="mn" id="c-t-split">€ 0,00</span></div>
+      <div class="tot-row" id="c-t-split-row" style="display:none;color:#9A5B00;font-weight:800"><span>A carico cliente (split payment)</span><span class="mn" id="c-t-split">€ 0,00</span></div>
     </div>
   </div>
 
@@ -1129,22 +1239,22 @@ function renderStoricoRevisioni(){
   const baseImp=(piuVecchia && piuVecchia.imponibile_prec!=null)?piuVecchia.imponibile_prec:null;
   let h=revs.map(r=>{
     const delta=(r.imponibile_prec!=null)?(parseFloat(r.imponibile||0)-parseFloat(r.imponibile_prec||0)):null;
-    const col=delta==null?'var(--text2,#8a94a6)':delta>0?'var(--teal,#00B4A6)':'#e0795f';
+    const col=delta==null?'var(--text2,#556070)':delta>0?'var(--teal,#0E6B64)':'#B42318';
     const dt=r.data?new Date(r.data).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-    return `<div style="padding:10px 12px;border-bottom:1px solid var(--brd,#24344d)">
+    return `<div style="padding:10px 12px;border-bottom:1px solid var(--brd,#E1E5EA)">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
         <b style="font-size:13px">rev.${r.rev}</b>
-        <span style="font-size:11px;color:var(--text2,#8a94a6)">${esc(dt)}</span>
+        <span style="font-size:11px;color:var(--text2,#556070)">${esc(dt)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:3px">
-        <span style="font-size:12px">Imponibile <b>${eur(r.imponibile)}</b>${r.imponibile_prec!=null?` <span style="color:var(--text2,#8a94a6)">(prec. ${eur(r.imponibile_prec)})</span>`:''}</span>
+        <span style="font-size:12px">Imponibile <b>${eur(r.imponibile)}</b>${r.imponibile_prec!=null?` <span style="color:var(--text2,#556070)">(prec. ${eur(r.imponibile_prec)})</span>`:''}</span>
         ${delta!=null?`<span style="font-size:12px;font-weight:700;color:${col}">${delta>=0?'+':''}${eur(delta)}</span>`:''}
       </div>
-      ${r.commessa?`<div style="font-size:10.5px;color:var(--text2,#8a94a6);margin-top:2px">→ commessa «${esc(r.commessa)}»${r.righe_n?' · '+r.righe_n+' voci':''}</div>`:''}
+      ${r.commessa?`<div style="font-size:10.5px;color:var(--text2,#556070);margin-top:2px">→ commessa «${esc(r.commessa)}»${r.righe_n?' · '+r.righe_n+' voci':''}</div>`:''}
     </div>`;
   }).join('');
   if(baseImp!=null){
-    h+=`<div style="padding:10px 12px;opacity:.75"><b style="font-size:13px">originale</b> <span style="font-size:12px;color:var(--text2,#8a94a6)">— imponibile accettato ${eur(baseImp)}</span></div>`;
+    h+=`<div style="padding:10px 12px;opacity:.75"><b style="font-size:13px">originale</b> <span style="font-size:12px;color:var(--text2,#556070)">— imponibile accettato ${eur(baseImp)}</span></div>`;
   }
   cont.innerHTML=h;
 }
@@ -1295,7 +1405,7 @@ function renderReferenti(){
         '<div>⏳ Da incassare <b>'+_refEur(daInc)+'</b></div>'+
         '<div>📋 Da fatturare <b>'+_refEur(daFatt)+'</b> <span class="sub">+IVA</span></div>'+
       '</div>'+
-      (cons.length?('<div style="margin-top:8px;font-size:12px;border-left:3px solid #e8a34b;padding-left:8px">'+cons.map(c=>{ const res=_refResiduo(c); const imp=(+c.imponibile||0); const parz=res<imp-0.009; return '📋 '+esc((c.numero||'')+' · '+(c.cantiere_nome&&!/^[a-z0-9_]{8,}$/.test(c.cantiere_nome)?c.cantiere_nome:(c.oggetto||'').slice(0,50)))+' — '+_refEur(res)+' <span class="sub">+IVA'+(parz?' · residuo di '+_refEur(imp):'')+' · '+esc(c.cliente_nome||'')+'</span>'; }).join('<br>')+'</div>'):'')+
+      (cons.length?('<div style="margin-top:8px;font-size:12px;border-left:3px solid #9A5B00;padding-left:8px">'+cons.map(c=>{ const res=_refResiduo(c); const imp=(+c.imponibile||0); const parz=res<imp-0.009; return '📋 '+esc((c.numero||'')+' · '+(c.cantiere_nome&&!/^[a-z0-9_]{8,}$/.test(c.cantiere_nome)?c.cantiere_nome:(c.oggetto||'').slice(0,50)))+' — '+_refEur(res)+' <span class="sub">+IVA'+(parz?' · residuo di '+_refEur(imp):'')+' · '+esc(c.cliente_nome||'')+'</span>'; }).join('<br>')+'</div>'):'')+
       (prev.length?('<div style="margin-top:8px;font-size:12px">'+prev.slice(0,6).map(p=>'• '+esc((p.numero||'')+' '+(p.oggetto||'').slice(0,50))+' — '+_refEur(p.totale)+' <span class="sub">('+esc(p.stato||'')+')</span>').join('<br>')+(prev.length>6?'<br><span class="sub">… e altri '+(prev.length-6)+'</span>':'')+'</div>'):'')+
     '</div>';
   });
@@ -1321,10 +1431,10 @@ let _prevDaRichiesta=null;   // {id,numero} della richiesta da cui nasce il prev
 const _RI_STATI={
   nuova:{label:'Nuova',col:'#6fb3e0'},
   qualificata:{label:'Qualificata',col:'#c98fd0'},
-  preventivo:{label:'Preventivo',col:'#e8a34b'},
+  preventivo:{label:'Preventivo',col:'#9A5B00'},
   confermata:{label:'Confermata',col:'#3fbf7f'},
-  importata:{label:'Importata',col:'#7a8aa0'},
-  persa:{label:'Persa',col:'#e0645f'}
+  importata:{label:'Importata',col:'#556070'},
+  persa:{label:'Persa',col:'#B42318'}
 };
 const _RI_ORD=['nuova','qualificata','preventivo','confermata','importata','persa'];
 
@@ -1333,10 +1443,10 @@ async function caricaRichieste(){
   try{
     const r=await fetch(SB_URL+'/rest/v1/richieste?select=*&order=creato_il.desc',{headers:SB_H,cache:'no-cache'});
     RICH=await r.json(); if(!Array.isArray(RICH)) RICH=[];
-  }catch(e){ if(box) box.innerHTML='<div style="color:#e0645f;padding:12px">Errore nel caricamento richieste</div>'; return; }
+  }catch(e){ if(box) box.innerHTML='<div style="color:#B42318;padding:12px">Errore nel caricamento richieste</div>'; return; }
   renderRichieste();
 }
-function _riBadge(st){ const s=_RI_STATI[st]||{label:st||'—',col:'#7a8aa0'}; return '<span style="background:'+s.col+'22;color:'+s.col+';padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap">'+s.label+'</span>'; }
+function _riBadge(st){ const s=_RI_STATI[st]||{label:st||'—',col:'#556070'}; return '<span style="background:'+s.col+'22;color:'+s.col+';padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap">'+s.label+'</span>'; }
 function renderRichieste(){
   const box=document.getElementById('rich-list'); if(!box) return;
   const cnt={}; _RI_ORD.forEach(s=>cnt[s]=0); RICH.forEach(r=>{ if(cnt[r.stato]!=null) cnt[r.stato]++; });
@@ -1600,6 +1710,7 @@ function calcola(){
   document.getElementById('t-imponibile').textContent=eur(imp);
   document.getElementById('t-iva').textContent=eur(iva);
   document.getElementById('t-totale').textContent=eur(tot);
+  { const tb=document.getElementById('t-totale-bar'); if(tb) tb.textContent=eur(tot); }
   let lbl='IVA '+perc+'%';
   if(tipo==='split')lbl='IVA '+perc+'% (scissione pagamenti – art. 17-ter)';
   if(tipo==='esente')lbl='Esente IVA (art. 10)';
@@ -2135,6 +2246,22 @@ function _vitaPrev(p){
   const pagata = emesse.length>0 && emesse.every(f=>f.stato==='pagata');
   return {acc, cant:!!cant, chiuso, fatt, pagata, daEmettere:daEmettere.length, cantNome:cant?cant.nome:null, manuale:!!p.cantiere_id};
 }
+// Stato del preventivo scritto in chiaro, con il codice colori del design system v2
+// (stessa logica della frase nel box "Vita del lavoro").
+function _statoPrevBadge(p){
+  const s=p.stato||'bozza';
+  let c,t;
+  if(s==='annullato'||s==='perso'){ c='br'; t=s==='perso'?'Perso':'Annullato'; }
+  else { const v=_vitaPrev(p);
+    if(v.pagata){ c='bg'; t='Saldato'; }
+    else if(v.fatt){ c='bi'; t='Fatturato'; }
+    else if(v.chiuso){ c='bo'; t='Da fatturare'; }
+    else if(v.cant){ c='bi'; t='In lavorazione'; }
+    else if(v.acc){ c='bg'; t='Accettato'; }
+    else if(s==='inviato'){ c='bo'; t='Inviato · in attesa'; }
+    else { c='bz'; t='Bozza'; } }
+  return `<span class="bx st ${c}">${t}</span>`;
+}
 function _vitaHTML(p,compatto){
   const v=_vitaPrev(p);
   const tappe=[
@@ -2145,8 +2272,8 @@ function _vitaHTML(p,compatto){
     {on:v.pagata,ico:'💰', tit:'Fattura pagata — lavoro chiuso'}
   ];
   return '<span style="display:inline-flex;gap:3px;align-items:center">'+tappe.map((t,i)=>
-    `<span title="${esc(t.tit)}" style="font-size:${compatto?'10px':'12px'};line-height:1;padding:${compatto?'2px 5px':'3px 7px'};border-radius:9px;border:1px solid ${t.on?'var(--teal,#00B4A6)':'var(--brd,#24344d)'};background:${t.on?'rgba(0,180,166,.15)':'transparent'};opacity:${t.on?'1':'.42'}">${t.ico}</span>`
-  ).join('<span style="color:var(--brd,#24344d);font-size:9px">—</span>')+'</span>';
+    `<span title="${esc(t.tit)}" style="font-size:${compatto?'10px':'12px'};line-height:1;padding:${compatto?'2px 5px':'3px 7px'};border-radius:9px;border:1px solid ${t.on?'var(--teal,#0E6B64)':'var(--brd,#E1E5EA)'};background:${t.on?'rgba(14,107,100,.15)':'transparent'};opacity:${t.on?'1':'.42'}">${t.ico}</span>`
+  ).join('<span style="color:var(--brd,#E1E5EA);font-size:9px">—</span>')+'</span>';
 }
 
 // Box "vita del lavoro" nell'editor: indicatore + selettore stato + collega cantiere
@@ -2158,14 +2285,14 @@ function renderVitaBox(){
   const stati=['bozza','inviato','accettato','annullato'];
   if(p.stato&&!stati.includes(p.stato)) stati.push(p.stato); // es. "convertito" legacy
   vb.style.display='flex'; vb.style.flexWrap='wrap';
-  vb.innerHTML='<b style="color:var(--text2,#8a94a6);text-transform:uppercase;letter-spacing:.5px;font-size:10px">Vita del lavoro</b> '
+  vb.innerHTML='<b style="color:var(--text2,#556070);text-transform:uppercase;letter-spacing:.5px;font-size:10px">Vita del lavoro</b> '
     +_vitaHTML(p,false)
-    +'<span style="color:var(--text2,#8a94a6)">'+frase+'</span>'
+    +'<span style="color:var(--text2,#556070)">'+frase+'</span>'
     +'<span style="flex:1"></span>'
-    +'<label style="font-size:10px;color:var(--text2,#8a94a6);text-transform:uppercase">Stato</label>'
-    +'<select onchange="cambiaStato(this.value)" style="background:var(--navy,#0a1628);border:1px solid var(--brd,#24344d);border-radius:7px;color:var(--text,#e0e6ed);font-size:12px;padding:4px 8px">'
+    +'<label style="font-size:10px;color:var(--text2,#556070);text-transform:uppercase">Stato</label>'
+    +'<select onchange="cambiaStato(this.value)" style="background:var(--navy,#F2F4F6);border:1px solid var(--brd,#E1E5EA);border-radius:7px;color:var(--text,#18222F);font-size:12px;padding:4px 8px">'
     +stati.map(s=>`<option value="${s}"${s===(p.stato||'bozza')?' selected':''}>${s}</option>`).join('')+'</select>'
-    +'<span onclick="apriCollega()" style="cursor:pointer;font-size:11px;color:var(--gold,#C9A227)">🔗 '+(v.manuale?'cantiere collegato a mano':'collega cantiere')+'</span>'
+    +'<span onclick="apriCollega()" style="cursor:pointer;font-size:11px;color:var(--gold,#9A5B00)">🔗 '+(v.manuale?'cantiere collegato a mano':'collega cantiere')+'</span>'
     +_vitaAzioniCommessa(p,v);
 }
 // Azioni commessa nel box "vita del lavoro": pulsante "Aggiorna commessa" (solo se
@@ -2175,10 +2302,10 @@ function _vitaAzioniCommessa(p,v){
   const nRev=(p.revisioni&&p.revisioni.length)?p.revisioni.length:(parseInt(p.rev,10)||0);
   let h='';
   if(v.cant){
-    h+='<button onclick="aggiornaCommessaGestionale()" title="Riallinea il ricavo della commessa nel Gestionale all\'imponibile attuale del preventivo e registra una revisione" style="background:rgba(0,180,166,.14);border:1px solid var(--teal,#00B4A6);border-radius:7px;color:var(--teal,#00B4A6);font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer">🔄 Aggiorna commessa</button>';
+    h+='<button onclick="aggiornaCommessaGestionale()" title="Riallinea il ricavo della commessa nel Gestionale all\'imponibile attuale del preventivo e registra una revisione" style="background:rgba(14,107,100,.14);border:1px solid var(--teal,#0E6B64);border-radius:7px;color:var(--teal,#0E6B64);font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer">🔄 Aggiorna commessa</button>';
   }
   if(nRev>0){
-    h+='<span onclick="apriStoricoRevisioni()" style="cursor:pointer;font-size:11px;color:var(--gold,#C9A227)" title="Storico delle revisioni sincronizzate con il Gestionale">📜 rev.'+nRev+'</span>';
+    h+='<span onclick="apriStoricoRevisioni()" style="cursor:pointer;font-size:11px;color:var(--gold,#9A5B00)" title="Storico delle revisioni sincronizzate con il Gestionale">📜 rev.'+nRev+'</span>';
   }
   return h;
 }
@@ -2221,9 +2348,9 @@ function renderListaCollega(filtro){
   const f=(filtro||'').trim().toLowerCase();
   let lista=CANT_V.slice().sort((a,b)=>(b.periodoInizio||'').localeCompare(a.periodoInizio||''));
   if(f) lista=lista.filter(c=>(c.nome||'').toLowerCase().includes(f)||(c.committente||'').toLowerCase().includes(f));
-  const riga=(id,ico,tit,sub,att)=>`<div onclick="scegliCollega('${id}')" style="display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border-bottom:1px solid var(--brd,#24344d);cursor:pointer${att?';background:rgba(0,180,166,.08)':''}">
-    <div><div style="font-size:13px;font-weight:600">${ico} ${esc(tit)}${att?' <span style="color:var(--teal,#00B4A6);font-size:10px">● attuale</span>':''}</div>
-    ${sub?`<div style="font-size:11px;color:var(--text2,#8a94a6)">${esc(sub)}</div>`:''}</div><span style="color:var(--teal,#00B4A6)">›</span></div>`;
+  const riga=(id,ico,tit,sub,att)=>`<div onclick="scegliCollega('${id}')" style="display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border-bottom:1px solid var(--brd,#E1E5EA);cursor:pointer${att?';background:rgba(14,107,100,.08)':''}">
+    <div><div style="font-size:13px;font-weight:600">${ico} ${esc(tit)}${att?' <span style="color:var(--teal,#0E6B64);font-size:10px">● attuale</span>':''}</div>
+    ${sub?`<div style="font-size:11px;color:var(--text2,#556070)">${esc(sub)}</div>`:''}</div><span style="color:var(--teal,#0E6B64)">›</span></div>`;
   let h=riga('__auto__','🤖','Automatico','riconosce il cantiere dal preventivo (consigliato)',!p.cantiere_id)
        +riga('__nessuno__','🚫','Nessun cantiere','forza lo scollegamento',p.cantiere_id==='__nessuno__');
   h+=lista.slice(0,50).map(c=>riga(c.id,'🏗',c.nome,c.committente||'',p.cantiere_id===c.id)).join('');
@@ -2249,10 +2376,11 @@ function renderLista(){
   const f=LISTA.filter(p=>!q||((p.numero||'')+(p.cliente_nome||'')+(p.oggetto||'')).toLowerCase().includes(q));
   document.getElementById('lista-prev').innerHTML=f.length?f.map(p=>`
     <div class="list-item" onclick="apriPreventivo(${p.id})">
-      <div><b>${esc(p.numero)}</b> · ${esc(p.cliente_nome||'—')}<div class="muted">${esc((p.oggetto||'').slice(0,70))}</div>
-      <div style="margin-top:4px">${_vitaHTML(p,true)}</div></div>
-      <div style="text-align:right"><div class="mn">${eur(p.totale)}</div><div class="muted">${p.data?new Date(p.data).toLocaleDateString('it-IT'):''}</div></div>
-    </div>`).join(''):'<div class="muted">Nessun preventivo in archivio.</div>';
+      <div style="min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px"><span class="li-num">${esc(p.numero)}</span>${_statoPrevBadge(p)}</div>
+      <div class="li-cli">${esc(p.cliente_nome||'—')}</div><div class="muted">${esc((p.oggetto||'').slice(0,90))}</div>
+      <div style="margin-top:6px">${_vitaHTML(p,true)}</div></div>
+      <div style="text-align:right;flex-shrink:0"><div class="li-imp">${eur(p.totale)}</div><div class="muted">${p.data?new Date(p.data).toLocaleDateString('it-IT'):''}</div></div>
+    </div>`).join(''):'<div class="muted" style="padding:12px 0">Nessun preventivo trovato. Tocca «Nuovo preventivo» per crearne uno.</div>';
 }
 async function apriPreventivo(id){
   const p=LISTA.find(x=>x.id===id);if(!p)return;
@@ -3117,8 +3245,8 @@ function renderConsuntivi(){
   const f=document.getElementById('cons-filtro').value||'';
   if(kpi){
     const tot=CONS.reduce((s,c)=>s+(parseFloat(c.totale)||0),0);
-    kpi.innerHTML='<div style="background:var(--card,#152438);border:1px solid var(--brd,#24344d);border-radius:10px;padding:8px 12px;font-size:12px">Consuntivi: <b>'+CONS.length+'</b></div>'+
-      '<div style="background:var(--card,#152438);border:1px solid var(--brd,#24344d);border-radius:10px;padding:8px 12px;font-size:12px">Totale: <b>'+eur(tot)+'</b></div>';
+    kpi.innerHTML='<div style="background:var(--card,#FFFFFF);border:1px solid var(--brd,#E1E5EA);border-radius:10px;padding:8px 12px;font-size:12px">Consuntivi: <b>'+CONS.length+'</b></div>'+
+      '<div style="background:var(--card,#FFFFFF);border:1px solid var(--brd,#E1E5EA);border-radius:10px;padding:8px 12px;font-size:12px">Totale: <b>'+eur(tot)+'</b></div>';
   }
   let lista=CONS.slice();
   if(f) lista=lista.filter(c=>(c.stato||'bozza')===f);
@@ -3129,8 +3257,8 @@ function renderConsuntivi(){
     const link=[c.preventivo_numero?('← '+esc(c.preventivo_numero)):'',c.cantiere_nome?('🏗 '+esc(c.cantiere_nome)):''].filter(Boolean).join(' · ');
     return '<div onclick="apriConsuntivo(\''+c.id+'\')" style="cursor:pointer;border:1px solid var(--brd);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
       '<div style="flex:1;min-width:160px"><b>'+esc(c.numero||'(senza numero)')+'</b> <span class="muted" style="font-size:11px">'+esc(dt)+'</span>'+
-        '<div style="font-size:12px;color:var(--text2,#8a94a6)">'+esc(c.cliente_nome||'')+(c.oggetto?' — '+esc(c.oggetto):'')+'</div>'+
-        (link?'<div style="font-size:10.5px;color:var(--gold,#C9A227);margin-top:2px">'+link+'</div>':'')+
+        '<div style="font-size:12px;color:var(--text2,#556070)">'+esc(c.cliente_nome||'')+(c.oggetto?' — '+esc(c.oggetto):'')+'</div>'+
+        (link?'<div style="font-size:10.5px;color:var(--gold,#9A5B00);margin-top:2px">'+link+'</div>':'')+
       '</div>'+
       '<div class="mn" style="font-weight:700">'+eur(c.totale)+'</div>'+
     '</div>';
@@ -3205,13 +3333,13 @@ function renderPrevPick(){
   box.innerHTML=lista.map(p=>{
     const dt=p.data?new Date(p.data).toLocaleDateString('it-IT'):'';
     const done=_PREVPICK_DONE.has(String(p.id));
-    const badge=_consApprov(p.stato)?'<span style="font-size:10px;font-weight:700;color:#04222b;background:var(--green,#43c59e);border-radius:6px;padding:1px 6px">APPROVATO</span>':('<span style="font-size:10px;color:var(--text2,#8a94a6)">'+esc(p.stato||'bozza')+'</span>');
-    const badgeDone=done?' <span style="font-size:10px;color:var(--gold,#C9A227)">✓ già consuntivato</span>':'';
+    const badge=_consApprov(p.stato)?'<span style="font-size:10px;font-weight:700;color:#FFFFFF;background:var(--green,#276B43);border-radius:6px;padding:1px 6px">APPROVATO</span>':('<span style="font-size:10px;color:var(--text2,#556070)">'+esc(p.stato||'bozza')+'</span>');
+    const badgeDone=done?' <span style="font-size:10px;color:var(--gold,#9A5B00)">✓ già consuntivato</span>':'';
     const cant=p.cantiere_ref?(' · 🏗 '+esc(p.cantiere_ref)):'';
-    return '<div onclick="scegliPrevConsuntivo('+p.id+')" style="cursor:pointer;padding:10px 12px;border-bottom:1px solid var(--brd,#24344d)">'+
+    return '<div onclick="scegliPrevConsuntivo('+p.id+')" style="cursor:pointer;padding:10px 12px;border-bottom:1px solid var(--brd,#E1E5EA)">'+
       '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b style="font-size:13px">'+esc(p.numero||'(senza numero)')+'</b><span class="mn" style="font-size:12px">'+eur(p.imponibile)+'</span></div>'+
-      '<div style="font-size:12px;color:var(--text2,#8a94a6)">'+esc(p.cliente_nome||'')+(p.oggetto?' — '+esc(p.oggetto):'')+'</div>'+
-      '<div style="font-size:10.5px;color:var(--text2,#8a94a6);margin-top:2px">'+esc(dt)+' · '+badge+cant+badgeDone+'</div>'+
+      '<div style="font-size:12px;color:var(--text2,#556070)">'+esc(p.cliente_nome||'')+(p.oggetto?' — '+esc(p.oggetto):'')+'</div>'+
+      '<div style="font-size:10.5px;color:var(--text2,#556070);margin-top:2px">'+esc(dt)+' · '+badge+cant+badgeDone+'</div>'+
     '</div>';
   }).join('');
 }
@@ -3325,28 +3453,68 @@ function renderModifiche(){
   const q=(document.getElementById('mod-cerca').value||'').toLowerCase();
   const f=document.getElementById('mod-filtro').value||'';
   const ic={preventivo:'📄',consuntivo:'📊',documento:'🗂'};
-  const colAz={creato:'#43c59e',modificato:'#C9A227',eliminato:'#e0795f'};
+  const colAz={creato:'#276B43',modificato:'#9A5B00',eliminato:'#B42318'};
   let lista=MODS.slice();
   if(f) lista=lista.filter(m=>m.entita===f);
   if(q) lista=lista.filter(m=>((m.numero||'')+' '+(m.sintesi||'')+' '+(m.entita||'')+' '+(m.azione||'')+' '+(m.utente||'')).toLowerCase().includes(q));
   if(!lista.length){ box.innerHTML='<div class="muted" style="padding:18px;text-align:center">Nessuna modifica registrata.</div>'; return; }
   box.innerHTML=lista.map(m=>{
     const dt=m.creato_il?new Date(m.creato_il).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-    const col=colAz[m.azione]||'var(--text2,#8a94a6)';
+    const col=colAz[m.azione]||'var(--text2,#556070)';
     return '<div style="border:1px solid var(--brd);border-radius:10px;padding:9px 12px;margin-bottom:7px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
       '<span style="font-size:16px">'+(ic[m.entita]||'•')+'</span>'+
       '<div style="flex:1;min-width:160px">'+
         '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b style="font-size:13px">'+esc(m.numero||'—')+'</b>'+
           '<span style="font-size:10px;font-weight:700;color:'+col+'">'+esc((m.azione||'').toUpperCase())+'</span>'+
-          '<span style="font-size:10px;color:var(--text2,#8a94a6)">'+esc(m.entita||'')+'</span></div>'+
-        (m.sintesi?'<div style="font-size:12px;color:var(--text2,#8a94a6)">'+esc(m.sintesi)+'</div>':'')+
+          '<span style="font-size:10px;color:var(--text2,#556070)">'+esc(m.entita||'')+'</span></div>'+
+        (m.sintesi?'<div style="font-size:12px;color:var(--text2,#556070)">'+esc(m.sintesi)+'</div>':'')+
       '</div>'+
-      '<div style="text-align:right;font-size:10.5px;color:var(--text2,#8a94a6)">'+esc(dt)+(m.utente?'<br>'+esc(m.utente):'')+'</div>'+
+      '<div style="text-align:right;font-size:10.5px;color:var(--text2,#556070)">'+esc(dt)+(m.utente?'<br>'+esc(m.utente):'')+'</div>'+
     '</div>';
   }).join('');
 }
 
+// ═══ DESIGN SYSTEM v2: sezione attiva, barra in basso (telefono), foglio "Altro", Esci ═══
+// Le viste di dettaglio accendono la loro sezione: editor → Preventivi, documenti → Documenti, consuntivo → Consuntivi.
+const _NAV_SEZ={editor:'lista',documenti:'docarchivio',consuntivo:'consarchivio'};
+function _navAttiva(v){
+  const s=_NAV_SEZ[v]||v;
+  document.querySelectorAll('[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===s));
+  const altro=document.getElementById('bn-altro');
+  if(altro) altro.classList.toggle('on',s==='modifiche'||s==='referenti');
+}
+function apriAltro(){ const f=document.getElementById('foglio-altro'); if(f) f.classList.add('open'); }
+function chiudiAltro(){ const f=document.getElementById('foglio-altro'); if(f) f.classList.remove('open'); }
+function altroVai(v){ chiudiAltro(); vista(v); }
+// il tasto Esci del login resta lui (con la sua conferma): qui lo si chiama dal menu
+function esciApp(){ chiudiAltro(); const b=document.getElementById('l81out'); if(b) b.click(); }
+(function(){
+  const _vista=vista;
+  vista=function(v){ _vista(v); _navAttiva(v); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>_navAttiva('editor'));
+  else _navAttiva('editor');
+})();
+
 init();
 </script>
+
+<!-- BARRA IN BASSO (telefono): le 4 sezioni più usate + Altro -->
+<nav id="bnav" aria-label="Sezioni">
+  <button class="bn" data-v="lista" onclick="vista('lista')"><svg class="ico"><use href="#i-prev"/></svg>Preventivi</button>
+  <button class="bn" data-v="richieste" onclick="vista('richieste')"><svg class="ico"><use href="#i-rich"/></svg>Richieste</button>
+  <button class="bn" data-v="consarchivio" onclick="vista('consarchivio')"><svg class="ico"><use href="#i-cons"/></svg>Consuntivi</button>
+  <button class="bn" data-v="docarchivio" onclick="vista('docarchivio')"><svg class="ico"><use href="#i-doc"/></svg>Documenti</button>
+  <button class="bn" id="bn-altro" onclick="apriAltro()"><svg class="ico"><use href="#i-altro"/></svg>Altro</button>
+</nav>
+<div id="foglio-altro" onclick="if(event.target===this)chiudiAltro()">
+  <div class="fa-box">
+    <div class="fa-h">Altro<button class="bs" style="min-height:44px;width:44px;padding:0" aria-label="Chiudi" onclick="chiudiAltro()">✕</button></div>
+    <div class="altro-lista">
+      <button class="nv" onclick="altroVai('modifiche')"><svg class="ico"><use href="#i-mod"/></svg>Modifiche</button>
+      <button class="nv" onclick="altroVai('referenti')"><svg class="ico"><use href="#i-ref"/></svg>Referenti</button>
+      <button class="nv" onclick="esciApp()"><svg class="ico"><use href="#i-esci"/></svg>Esci</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
