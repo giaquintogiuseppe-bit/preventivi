@@ -11,6 +11,7 @@
 <link rel="manifest" href="manifest.json?v=2">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="raggruppa.js?v=20261112b"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -2564,13 +2565,21 @@ function renderLista(){
   const q=(document.getElementById('cerca-prev').value||'').toLowerCase();
   const f=LISTA.filter(p=>_matchStato(p)&&(!q||((p.numero||'')+(p.cliente_nome||'')+(p.oggetto||'')).toLowerCase().includes(q)));
   _renderKpiLista(); _renderChipsLista();
-  document.getElementById('lista-prev').innerHTML=f.length?f.map(p=>`
+  const _rg=typeof RAGGRUPPA!=='undefined'; if(_rg) RAGGRUPPA.registra('preventivi', renderLista);
+  const _riga=p=>`
     <div class="list-item" onclick="apriPreventivo(${p.id})">
       <div style="min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px"><span class="li-num">${esc(p.numero)}</span>${_statoPrevBadge(p)}${_revBadge(p)}${_ricontattaBadge(p)}</div>
       <div class="li-cli">${esc(p.cliente_nome||'—')}</div><div class="muted">${esc((p.oggetto||'').slice(0,90))}</div>
       <div style="margin-top:6px">${_vitaHTML(p,true)}</div></div>
       <div style="text-align:right;flex-shrink:0"><div class="li-imp">${eur(p.totale)}</div><div class="muted">${p.data?new Date(p.data).toLocaleDateString('it-IT'):''}</div></div>
-    </div>`).join(''):'<div class="muted" style="padding:12px 0">Nessun preventivo trovato. Tocca «Nuovo preventivo» per crearne uno.</div>';
+    </div>`;
+  // Da seguire in cima (bozze e inviati), il resto per anno ▸ mese della data (raggruppa.js); la ricerca mostra tutto
+  document.getElementById('lista-prev').innerHTML=f.length
+    ? (_rg ? '<div style="margin-bottom:10px">'+RAGGRUPPA.selettoreAnno('preventivi',LISTA,p=>p.data)+'</div>'
+             +RAGGRUPPA.tabella({ chiave:'preventivi', modo:'blocchi', voci:f, cerca:q, riga:_riga, data:p=>p.data,
+                 somma:p=>parseFloat(p.totale)||0, formato:eur, daSeguire:p=>['bozza','inviato'].includes(p.stato||'bozza') })
+           : f.map(_riga).join(''))
+    : '<div class="muted" style="padding:12px 0">Nessun preventivo trovato. Tocca «Nuovo preventivo» per crearne uno.</div>';
 }
 async function apriPreventivo(id){
   const p=LISTA.find(x=>x.id===id);if(!p)return;
@@ -3099,14 +3108,19 @@ function renderDocumenti(){
     return ((d.numero||'')+' '+(d.destinatario_nome||'')+' '+(d.oggetto||'')+' '+(d.luogo||'')).toLowerCase().includes(q);
   });
   if(!lista.length){ box.innerHTML='<div class="muted" style="padding:18px;text-align:center">Nessun documento in archivio.</div>'; return; }
-  box.innerHTML=lista.map(d=>{
+  const _rg=typeof RAGGRUPPA!=='undefined'; if(_rg) RAGGRUPPA.registra('documenti', renderDocumenti);
+  const _riga=d=>{
     const t=DOC_TIPI[d.tipo]||DOC_TIPI.lettera;
     return '<div onclick="apriDocumento(\''+d.id+'\')" style="cursor:pointer;border:1px solid var(--brd);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
       '<span style="background:'+t.col+'22;color:'+t.col+';padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap">'+t.icona+' '+esc(t.label)+'</span>'+
       '<b style="white-space:nowrap">'+esc(d.numero||'—')+'</b>'+
       '<span style="flex:1;min-width:120px">'+esc(d.destinatario_nome||d.luogo||'—')+'<br><span class="muted" style="font-size:12px">'+esc((d.oggetto||'').slice(0,90))+'</span></span>'+
       '<span class="muted" style="font-size:12px;white-space:nowrap">'+_dataIt(d.data)+'</span></div>';
-  }).join('');
+  };
+  // per anno ▸ mese della data del documento (raggruppa.js); la ricerca mostra tutto
+  box.innerHTML = _rg ? '<div style="margin-bottom:10px">'+RAGGRUPPA.selettoreAnno('documenti',DOCS,d=>d.data)+'</div>'
+      +RAGGRUPPA.tabella({ chiave:'documenti', modo:'blocchi', voci:lista, cerca:q, riga:_riga, data:d=>d.data })
+    : lista.map(_riga).join('');
 }
 
 async function apriDocumento(id){
@@ -3442,7 +3456,8 @@ function renderConsuntivi(){
   if(f) lista=lista.filter(c=>(c.stato||'bozza')===f);
   if(q) lista=lista.filter(c=>((c.numero||'')+' '+(c.cliente_nome||'')+' '+(c.oggetto||'')+' '+(c.cantiere_nome||'')+' '+(c.preventivo_numero||'')).toLowerCase().includes(q));
   if(!lista.length){ box.innerHTML='<div class="muted" style="padding:18px;text-align:center">Nessun consuntivo in archivio.</div>'; return; }
-  box.innerHTML=lista.map(c=>{
+  const _rg=typeof RAGGRUPPA!=='undefined'; if(_rg) RAGGRUPPA.registra('consuntivi', renderConsuntivi);
+  const _riga=c=>{
     const dt=c.data?new Date(c.data).toLocaleDateString('it-IT'):'';
     const link=[c.preventivo_numero?('← '+esc(c.preventivo_numero)):'',c.cantiere_nome?('🏗 '+esc(c.cantiere_nome)):''].filter(Boolean).join(' · ');
     return '<div onclick="apriConsuntivo(\''+c.id+'\')" style="cursor:pointer;border:1px solid var(--brd);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
@@ -3452,7 +3467,12 @@ function renderConsuntivi(){
       '</div>'+
       '<div class="mn" style="font-weight:700">'+eur(c.totale)+'</div>'+
     '</div>';
-  }).join('');
+  };
+  // Da seguire in cima (bozza, definitivo, inviato: non ancora fatturati), il resto per anno ▸ mese (raggruppa.js)
+  box.innerHTML = _rg ? '<div style="margin-bottom:10px">'+RAGGRUPPA.selettoreAnno('consuntivi',CONS,c=>c.data)+'</div>'
+      +RAGGRUPPA.tabella({ chiave:'consuntivi', modo:'blocchi', voci:lista, cerca:q, riga:_riga, data:c=>c.data,
+          somma:c=>parseFloat(c.totale)||0, formato:eur, daSeguire:c=>['bozza','definitivo','inviato'].includes(c.stato||'bozza') })
+    : lista.map(_riga).join('');
 }
 async function apriConsuntivo(id){
   let c=CONS.find(x=>String(x.id)===String(id));

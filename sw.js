@@ -1,4 +1,4 @@
-// sw.js — service worker dell'app Amministrazione 81|00, v28.
+// sw.js — service worker dell'app Amministrazione 81|00, v29.
 //
 // Obiettivi:
 //  - AVVIO RAPIDO: il "guscio" dell'app (HTML, icone, librerie) può arrivare
@@ -11,7 +11,7 @@
 // Strategia pagina: "network-first con timeout" — se la rete risponde entro
 // pochi secondi si usa la versione fresca; se è lenta o assente si usa la copia
 // in cache (apertura comunque rapida e funzionante offline).
-const CACHE = 'otto8100-amm-v28';
+const CACHE = 'otto8100-amm-v29';
 const PRECACHE = ['./', './index.html'];
 
 self.addEventListener('install', e => {
