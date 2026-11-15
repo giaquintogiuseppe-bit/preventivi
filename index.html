@@ -259,6 +259,63 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
   div.rg-h button,tr.rg-h button{min-height:44px}
   .mo button[style*="font-size:20px"]{min-width:44px;min-height:44px}
 }
+/* ═══ EDITOR PREVENTIVO — rifinitura (nov 2026) ═══ */
+/* righe voci: ogni campo ha la sua etichetta (su telefono; su computer resta l'intestazione di colonna) */
+.riga-voce .vf{display:block;margin:0;min-width:0}
+.riga-voce .vf>span{display:none}
+.riga-voce .vf input{width:100%}
+/* box "Vita del lavoro" */
+.vita-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:12px;gap:10px 12px;box-shadow:var(--sh1)}
+.vita-box>*{flex:0 0 100%;min-width:0}
+.vb-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)}
+.vb-frase{font-size:14px;font-weight:600;color:var(--text)}
+.vb-az{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding-top:10px;border-top:1px solid var(--line)}
+.vb-sel{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase}
+.vb-sel select{width:auto;min-height:40px;font-size:14px;font-weight:600;text-transform:none;color:var(--text)}
+.vb-lk{display:inline-flex;align-items:center;min-height:40px;font-size:13px;font-weight:600;color:var(--warn);cursor:pointer}
+.vb-btn{min-height:40px;padding:0 14px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent-hover);border-radius:var(--r2);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.vb-btn:hover{background:var(--accent-softer)}
+/* tracciato degli stati: pallino pieno con spunta = fatto, anello = tappa attuale */
+.vs{display:flex;flex-wrap:wrap;align-items:center;gap:8px 0}
+.vs-s{display:inline-flex;align-items:center;gap:6px;margin-right:2px}
+.vs-d{width:20px;height:20px;border-radius:50%;border:2px solid var(--line-strong);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:#fff;flex-shrink:0}
+.vs-s.done .vs-d{background:var(--accent);border-color:var(--accent)}
+.vs-s.done .vs-d::after{content:'✓'}
+.vs-s.now .vs-d{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.vs-t{font-size:13px;font-weight:600;color:var(--text2)}
+.vs-s.done .vs-t{color:var(--text)}
+.vs-s.now .vs-t{color:var(--accent-hover);font-weight:700}
+.vs-l{width:16px;height:2px;background:var(--line-strong);margin-right:4px}
+.vs-l.on{background:var(--accent)}
+@media(max-width:640px){
+  /* moduli: i campi corti stanno in coppia (Numero/Data, P.IVA/Riferimento), gli altri a tutta larghezza */
+  .fg{grid-template-columns:1fr 1fr;gap:12px}
+  .fg .full{grid-column:1/-1}
+  /* righe voci: descrizione in alto, poi Q.tà e Prezzo affiancati, poi importo ed elimina */
+  .riga-voce.muted{display:none}
+  .riga-voce:not(.muted){grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+  .riga-voce:not(.muted)>.vf{grid-column:auto}
+  .riga-voce .vf>span{display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px}
+  .riga-voce .vi{align-self:center}
+  .riga-voce .vi .mn{text-align:left !important;font-size:18px !important;font-weight:700;padding:0 !important}
+  .riga-voce>.bd{justify-self:end;width:44px;min-height:44px}
+  /* tracciato degli stati: 3 per riga, senza trattini */
+  .vs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 6px}
+  .vs-l{display:none}
+  .vita-box{padding:14px}
+  .vb-btn,.vb-lk,.vb-sel select{min-height:44px}
+  .vb-sel{flex:1 1 100%}
+  .vb-sel select{flex:1}
+  /* barra in basso: il totale non va a capo */
+  .azioni-bar{gap:6px;padding-left:12px}
+  .azioni-tot b{white-space:nowrap;font-size:17px}
+  .azioni-bar .bs,.azioni-bar .btn{padding:0 12px}
+  /* titolo scheda con nota: la nota va sotto */
+  .card h2{flex-wrap:wrap}
+  .card h2 .muted{flex-basis:100%}
+  .attr-riga{grid-template-columns:minmax(0,1fr) 64px 44px}
+  .attr-ext select,.attr-ext input{min-height:44px}
+}
 </style>
 <!-- ═══════════════════════════════════════════════════════════════════════
      81|00 — Modulo di LOGIN unico per le app (da incollare nell'<head>,
@@ -581,7 +638,7 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
       </div>
     </div>
 
-    <div id="vita-box" style="display:none;align-items:center;gap:10px;margin-bottom:12px;background:var(--card,#FFFFFF);border:1px solid var(--brd,#E1E5EA);border-radius:10px;padding:9px 14px;font-size:12px"></div>
+    <div id="vita-box" class="vita-box" style="display:none"></div>
 
     <!-- Revisioni in evidenza: timeline inline (legge p.revisioni, additiva) -->
     <div id="rev-box" style="display:none;margin-bottom:12px"></div>
@@ -1889,10 +1946,10 @@ function renderVoci(){
   document.getElementById('voci-list').innerHTML=VOCI.map((v,i)=>`
     <div class="riga-voce">
       <input value="${esc(v.desc)}" placeholder="Descrizione..." oninput="VOCI[${i}].desc=this.value">
-      <input type="number" value="${v.qta}" oninput="VOCI[${i}].qta=parseFloat(this.value)||0;calcola()" style="text-align:center">
-      <input type="number" step="0.01" value="${v.prezzo}" oninput="VOCI[${i}].prezzo=parseFloat(this.value)||0;calcola()">
-      <div class="mn" style="font-size:13px;padding-right:4px">${eur(v.qta*v.prezzo)}</div>
-      <button class="bd" style="padding:4px 8px" onclick="VOCI.splice(${i},1);renderVoci();calcola()">✕</button>
+      <label class="vf vf-q"><span>Q.tà</span><input type="number" value="${v.qta}" oninput="VOCI[${i}].qta=parseFloat(this.value)||0;calcola()" style="text-align:center"></label>
+      <label class="vf vf-p"><span>Prezzo €</span><input type="number" step="0.01" value="${v.prezzo}" oninput="VOCI[${i}].prezzo=parseFloat(this.value)||0;calcola()"></label>
+      <div class="vf vi"><span>Importo</span><div class="mn" style="font-size:13px;padding-right:4px">${eur(v.qta*v.prezzo)}</div></div>
+      <button class="bd" style="padding:4px 8px" onclick="VOCI.splice(${i},1);renderVoci();calcola()" aria-label="Elimina voce">✕</button>
     </div>`).join('');
 }
 
@@ -2477,9 +2534,8 @@ function _vitaHTML(p,compatto){
 // Stepper visivo "Vita del lavoro" per la scheda: Bozza → Inviato → Accettato → Cantiere → Fatturato → Saldato
 function _vitaStepper(p){
   const v=_vitaPrev(p); const s=p.stato||'bozza';
-  const T='var(--teal,#0E6B64)', B='var(--line-strong,#cbd2da)', t2='var(--text2,#556070)';
   if(s==='annullato'||s==='perso'){
-    return '<span style="font-size:11px;font-weight:700;color:var(--red,#B42318);background:var(--danger-soft,#fce8e6);border:1px solid var(--red,#B42318);border-radius:999px;padding:3px 10px">⊘ '+(s==='perso'?'Perso':'Annullato')+'</span>';
+    return '<span class="bx st br">⊘ '+(s==='perso'?'Perso':'Annullato')+'</span>';
   }
   const inviato=v.acc||s==='inviato';
   const tappe=[
@@ -2490,13 +2546,10 @@ function _vitaStepper(p){
     {done:v.fatt,   now:(v.fatt&&!v.pagata),      l:'Fatturato'},
     {done:v.pagata, now:v.pagata,                 l:'Saldato'}
   ];
-  let h='<span style="display:inline-flex;align-items:center;flex-wrap:wrap;gap:0">';
+  let h='<span class="vs">';
   tappe.forEach((t,i)=>{
-    if(i) h+='<span style="width:14px;height:2px;background:'+(t.done?T:B)+'"></span>';
-    const bg=t.done?T:'transparent', bd=(t.done||t.now)?T:B, col=t.done?'var(--text,#18222f)':(t.now?T:t2);
-    h+='<span style="display:inline-flex;align-items:center;gap:5px;margin-right:2px">'
-      +'<span style="width:16px;height:16px;border-radius:50%;background:'+bg+';border:2px solid '+bd+';'+(t.now&&!t.done?'box-shadow:0 0 0 3px var(--accent-soft,#e3f1ef)':'')+'"></span>'
-      +'<span style="font-size:11px;font-weight:600;color:'+col+'">'+t.l+'</span></span>';
+    if(i) h+='<span class="vs-l'+(t.done?' on':'')+'"></span>';
+    h+='<span class="vs-s'+(t.done?' done':'')+(t.now?' now':'')+'"><span class="vs-d"></span><span class="vs-t">'+t.l+'</span></span>';
   });
   return h+'</span>';
 }
@@ -2510,15 +2563,15 @@ function renderVitaBox(){
   const stati=['bozza','inviato','accettato','annullato'];
   if(p.stato&&!stati.includes(p.stato)) stati.push(p.stato); // es. "convertito" legacy
   vb.style.display='flex'; vb.style.flexWrap='wrap';
-  vb.innerHTML='<b style="color:var(--text2,#556070);text-transform:uppercase;letter-spacing:.5px;font-size:10px">Vita del lavoro</b> '
-    +_vitaStepper(p)+'<span style="flex-basis:100%;height:4px"></span>'
-    +'<span style="color:var(--text2,#556070)">'+frase+'</span>'
-    +'<span style="flex:1"></span>'
-    +'<label style="font-size:10px;color:var(--text2,#556070);text-transform:uppercase">Stato</label>'
-    +'<select onchange="cambiaStato(this.value)" style="background:var(--navy,#F2F4F6);border:1px solid var(--brd,#E1E5EA);border-radius:7px;color:var(--text,#18222F);font-size:12px;padding:4px 8px">'
-    +stati.map(s=>`<option value="${s}"${s===(p.stato||'bozza')?' selected':''}>${s}</option>`).join('')+'</select>'
-    +'<span onclick="apriCollega()" style="cursor:pointer;font-size:11px;color:var(--gold,#9A5B00)">🔗 '+(v.manuale?'cantiere collegato a mano':'collega cantiere')+'</span>'
-    +_vitaAzioniCommessa(p,v);
+  vb.innerHTML='<div class="vb-h">Vita del lavoro</div>'
+    +'<div class="vb-step">'+_vitaStepper(p)+'</div>'
+    +'<div class="vb-frase">'+frase+'</div>'
+    +'<div class="vb-az">'
+      +'<label class="vb-sel"><span>Stato</span><select onchange="cambiaStato(this.value)">'
+      +stati.map(s=>`<option value="${s}"${s===(p.stato||'bozza')?' selected':''}>${s}</option>`).join('')+'</select></label>'
+      +'<span class="vb-lk" role="button" onclick="apriCollega()">🔗 '+(v.manuale?'cantiere collegato a mano':'collega cantiere')+'</span>'
+      +_vitaAzioniCommessa(p,v)
+    +'</div>';
   try{ renderRevBox(); }catch(e){}
   try{ renderLinkBox(); }catch(e){}
 }
@@ -2529,10 +2582,10 @@ function _vitaAzioniCommessa(p,v){
   const nRev=(p.revisioni&&p.revisioni.length)?p.revisioni.length:(parseInt(p.rev,10)||0);
   let h='';
   if(v.cant){
-    h+='<button onclick="aggiornaCommessaGestionale()" title="Riallinea il ricavo della commessa nel Gestionale all\'imponibile attuale del preventivo e registra una revisione" style="background:rgba(14,107,100,.14);border:1px solid var(--teal,#0E6B64);border-radius:7px;color:var(--teal,#0E6B64);font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer">🔄 Aggiorna commessa</button>';
+    h+='<button class="vb-btn" onclick="aggiornaCommessaGestionale()" title="Riallinea il ricavo della commessa nel Gestionale all\'imponibile attuale del preventivo e registra una revisione">🔄 Aggiorna commessa</button>';
   }
   if(nRev>0){
-    h+='<span onclick="apriStoricoRevisioni()" style="cursor:pointer;font-size:11px;color:var(--gold,#9A5B00)" title="Storico delle revisioni sincronizzate con il Gestionale">📜 rev.'+nRev+'</span>';
+    h+='<span class="vb-lk" role="button" onclick="apriStoricoRevisioni()" title="Storico delle revisioni sincronizzate con il Gestionale">📜 rev.'+nRev+'</span>';
   }
   return h;
 }
