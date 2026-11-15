@@ -12,9 +12,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="raggruppa.js?v=20261113"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ═══ DESIGN SYSTEM 81|00 v2 (nov 2026) — lo stesso del Planning ═══════════
    Pochi colori, ognuno con un significato. Verde acqua = azione principale e voce attiva.
@@ -29,12 +26,12 @@
   --warn:#9a5b00;--warn-soft:#fbefd9;--danger:#b42318;--danger-soft:#fce8e6;--danger-line:#f1b5ae;
   --muted:#556070;--muted-soft:#edf0f3;
   --sh1:0 1px 2px rgba(16,24,40,.06);--sh2:0 12px 32px rgba(16,24,40,.14);
-  --r:10px;--r2:6px;--r3:16px;--mono:'IBM Plex Mono',ui-monospace,monospace;
+  --r:10px;--r2:6px;--r3:16px;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --navy:var(--bg);--navy2:var(--surface-2);--card:var(--surface);--brd:var(--line);
   --teal:var(--accent);--teal2:var(--accent-hover);--gold:var(--warn);--red:var(--danger);--green:var(--ok)
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ico{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .wrap{max-width:1080px;margin:0 auto;padding:0 24px 24px}
@@ -173,8 +170,9 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
   .riga-voce:not(.muted){background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:10px}
   .riga-voce .bd{min-height:44px;padding:0}
   .riga-voce .mn{text-align:right;font-size:14px !important}
-  .list-item{flex-direction:column;align-items:stretch;gap:8px;padding:14px 16px}
-  .list-item>div:last-child{text-align:left !important;display:flex;justify-content:space-between;align-items:baseline}
+  .list-item:not(.pv){flex-direction:column;align-items:stretch;gap:8px;padding:14px 16px}
+  .list-item.pv{padding:14px 16px}
+  .list-item:not(.pv)>div:last-child{text-align:left !important;display:flex;justify-content:space-between;align-items:baseline}
   .azioni-bar{bottom:calc(72px + env(safe-area-inset-bottom));padding:8px 8px 8px 14px;gap:8px}
   .azioni-bar .lbl-l{display:none}
   .azioni-tot b{font-size:18px}
@@ -183,6 +181,83 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
   .bn .ico{width:22px;height:22px}
   .bn.on{color:var(--accent);border-top-color:var(--accent);font-weight:600}
   .toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+}
+/* ═══ RIFINITURA UI (nov 2026) — classi al posto degli stili scritti a mano nel JavaScript ═══
+   Stessa lingua del design v2. Il colore codifica solo lo STATO e c'è sempre la parola. */
+/* Lista preventivi: indicatori in una fascia, filtri e ricerca sempre in vista */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.kpi-t{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;min-width:0}
+.kpi-t.warn{border:2px solid var(--warn);background:var(--warn-soft)}
+.kpi-l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);white-space:nowrap}
+.kpi-v{font-size:20px;font-weight:700;line-height:1.25;font-variant-numeric:tabular-nums;white-space:nowrap}
+.kpi-t.warn .kpi-v{color:var(--warn)}
+.kpi-s{font-size:12px;color:var(--text2);white-space:nowrap}
+.filtri-sticky{position:sticky;top:0;z-index:20;background:var(--surface);margin:0 -24px 10px;padding:8px 24px 4px;border-bottom:1px solid var(--line)}
+.filtri-sticky #cerca-prev{margin-bottom:8px}
+.chips-f{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none}
+.chips-f::-webkit-scrollbar{display:none}
+.chipf{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.chipf:hover{background:var(--surface-2)}
+.chipf.on{background:var(--text);border-color:var(--text);color:#fff}
+.chipf.on::before{content:'✓'}
+/* Riga preventivo: cliente e importo in evidenza, il resto sotto */
+.list-item.pv{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"top top" "cli imp" "ogg ogg" "vit dat";gap:4px 16px;align-items:baseline}
+.pv-top{grid-area:top;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+.pv .li-cli{grid-area:cli;overflow-wrap:anywhere;line-height:1.3}
+.pv .li-imp{grid-area:imp;text-align:right;font-size:18px;font-weight:700;white-space:nowrap}
+.pv-ogg{grid-area:ogg;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pv-data{grid-area:dat;text-align:right;white-space:nowrap;align-self:center}
+.pv-vita{grid-area:vit;margin-top:4px;align-self:center}
+/* Vita del lavoro: icone leggibili */
+.vt{display:inline-flex;align-items:center;gap:3px}
+.vt-i{font-size:13px;line-height:1;padding:3px 6px;border-radius:9px;border:1px solid var(--line);opacity:.45}
+.vt-i.on{border-color:var(--accent);background:var(--accent-soft);opacity:1}
+.vt-s{color:var(--line-strong);font-size:9px}
+.vt:not(.vt-c) .vt-i{font-size:15px;padding:4px 8px}
+/* Richieste, consuntivi, documenti, modifiche: righe e indicatori coerenti */
+.kpi-chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+#doc-kpi,#cons-kpi{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.kpi-c{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;font-size:13px}
+.kpi-c b{font-weight:700}
+.empty-s{text-align:center;color:var(--text2);font-size:14px;padding:22px 14px;border:1px dashed var(--line-strong);border-radius:var(--r);background:var(--surface-2)}
+.card.rc{margin-bottom:10px;padding:14px;cursor:pointer}
+.rc-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.rc-main{min-width:0}
+.rc-t{font-size:16px;font-weight:700;line-height:1.3}
+.rc-s{font-size:13px;color:var(--text2);margin-top:2px}
+.rc-o{font-size:13px;margin-top:4px}
+.rc-r{text-align:right;white-space:nowrap;flex-shrink:0}
+.rc-b{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:6px}
+.rc-act{margin-top:10px;display:flex;justify-content:flex-end}
+.bs.sm{min-height:40px;padding:0 14px;font-size:13px}
+.rowc{cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap}
+.rowc:hover{border-color:var(--line-strong)}
+.rowc-m{flex:1;min-width:160px}
+.rowc-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rowc-s{font-size:14px;color:var(--text)}
+.rowc-l{font-size:12px;color:var(--warn);margin-top:2px}
+.rowc-i{font-size:16px;font-weight:700;white-space:nowrap}
+.rowc-n{white-space:nowrap}
+.rowc-d{white-space:nowrap;font-size:13px}
+.rowc.mod{cursor:default;padding:10px 14px}
+.rowc.mod .rowc-i{font-size:12px;font-weight:400;color:var(--text2);text-align:right}
+@media(max-width:640px){
+  .filtri-sticky{margin:0 -16px 10px;padding:8px 16px 4px}
+  /* indicatori: una fascia che scorre di lato, così l'elenco parte subito */
+  .kpi-strip{display:flex;overflow-x:auto;scroll-snap-type:x proximity;gap:8px;margin:0 -16px 10px;padding:0 16px 2px;scrollbar-width:none}
+  .kpi-strip::-webkit-scrollbar{display:none}
+  .kpi-t{flex:0 0 148px;scroll-snap-align:start}
+  .chipf{min-height:44px}
+  .bs.sm,.bd{min-height:44px}
+  .tab{min-height:44px}
+  .rowc{padding:12px}
+  .rowc-i{margin-left:auto}
+  /* spazio per la barra in basso: sul body (non solo su .wrap), così non resta un vuoto sotto l'intestazione nelle viste fuori da .wrap */
+  .wrap{padding-bottom:0}
+  body{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+  /* intestazioni anno/mese (raggruppa.js) e chiusura dei pannelli: bersaglio da 44px */
+  div.rg-h button,tr.rg-h button{min-height:44px}
+  .mo button[style*="font-size:20px"]{min-width:44px;min-height:44px}
 }
 </style>
 <!-- ═══════════════════════════════════════════════════════════════════════
@@ -534,8 +609,10 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
     <div class="card">
       <h2>📁 Archivio preventivi</h2>
       <div id="lista-kpi"></div>
-      <div id="lista-chips"></div>
-      <input id="cerca-prev" placeholder="🔍 Cerca per numero, cliente, oggetto..." oninput="renderLista()" style="margin-bottom:12px">
+      <div class="filtri-sticky">
+        <div id="lista-chips"></div>
+        <input id="cerca-prev" placeholder="🔍 Cerca per numero, cliente, oggetto..." oninput="renderLista()">
+      </div>
       <div id="lista-prev"></div>
     </div>
   </div>
@@ -550,7 +627,7 @@ th{color:var(--text2);font-size:12px;font-weight:600;background:var(--surface-2)
           <button class="btn" onclick="nuovaRichiesta()">➕ Nuova</button>
         </div>
       </div>
-      <div id="rich-kpi" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"></div>
+      <div id="rich-kpi" class="kpi-chips"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
         <input id="rich-cerca" placeholder="🔍 Cerca richiedente, cliente, oggetto..." oninput="renderRichieste()" style="flex:1;min-width:180px">
         <select id="rich-filtro" onchange="renderRichieste()">
@@ -1565,19 +1642,20 @@ async function caricaRichieste(){
   }catch(e){ if(box) box.innerHTML='<div style="color:#B42318;padding:12px">Errore nel caricamento richieste</div>'; return; }
   renderRichieste();
 }
-function _riBadge(st){ const s=_RI_STATI[st]||{label:st||'—',col:'#556070'}; return '<span style="background:'+s.col+'22;color:'+s.col+';padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap">'+s.label+'</span>'; }
+const _RI_CLS={nuova:'bi',qualificata:'bi',preventivo:'bo',confermata:'bg',importata:'bz',persa:'br'};
+function _riBadge(st){ const s=_RI_STATI[st]||{label:st||'—'}; return '<span class="bx st '+(_RI_CLS[st]||'bz')+'">'+s.label+'</span>'; }
 function renderRichieste(){
   const box=document.getElementById('rich-list'); if(!box) return;
   const cnt={}; _RI_ORD.forEach(s=>cnt[s]=0); RICH.forEach(r=>{ if(cnt[r.stato]!=null) cnt[r.stato]++; });
   const kpi=document.getElementById('rich-kpi');
-  if(kpi) kpi.innerHTML=_RI_ORD.map(s=>'<span style="font-size:12px;background:rgba(255,255,255,.04);border:1px solid var(--brd);border-radius:8px;padding:5px 9px">'+_RI_STATI[s].label+' <b style="color:'+_RI_STATI[s].col+'">'+cnt[s]+'</b></span>').join('');
+  if(kpi) kpi.innerHTML=_RI_ORD.map(s=>'<span class="bx st '+(_RI_CLS[s]||'bz')+'">'+_RI_STATI[s].label+' <b>'+cnt[s]+'</b></span>').join('');
   const q=(document.getElementById('rich-cerca')?document.getElementById('rich-cerca').value:'').toLowerCase().trim();
   const f=document.getElementById('rich-filtro')?document.getElementById('rich-filtro').value:'attive';
   let l=RICH.slice();
   if(f==='attive') l=l.filter(r=>r.stato!=='importata'&&r.stato!=='persa');
   else if(f!=='tutte') l=l.filter(r=>r.stato===f);
   if(q) l=l.filter(r=>((r.richiedente_nome||'')+' '+(r.cliente_nome||'')+' '+(r.oggetto||'')+' '+(r.numero||'')).toLowerCase().includes(q));
-  if(!l.length){ box.innerHTML='<div class="muted" style="text-align:center;padding:20px">Nessuna richiesta in questa vista.</div>'; return; }
+  if(!l.length){ box.innerHTML='<div class="empty-s"><b>Nessuna richiesta in questa vista.</b><br>Cambia filtro o tocca «➕ Nuova» per registrarne una.</div>'; return; }
   box.innerHTML=l.map(r=>_riCard(r)).join('');
 }
 function _riCard(r){
@@ -1585,15 +1663,15 @@ function _riCard(r){
   const sub=[r.tipo,r.canale,r.luogo].filter(Boolean).map(esc).join(' · ');
   const idx=_RI_ORD.indexOf(r.stato);
   const next=(idx>=0&&idx<3)?_RI_ORD[idx+1]:null;
-  return '<div class="card" style="margin-bottom:10px;cursor:pointer;padding:14px" onclick="apriRichiesta(\''+r.id+'\')">'+
-    '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">'+
-      '<div style="min-width:0"><div style="font-weight:700">'+chi+'</div>'+
-      '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+esc(r.numero||'')+(sub?' · '+sub:'')+'</div>'+
-      (r.oggetto?'<div style="font-size:12px;margin-top:4px">'+esc(r.oggetto)+'</div>':'')+'</div>'+
-      '<div style="text-align:right;white-space:nowrap">'+_riBadge(r.stato)+
-      (r.budget_indicativo?'<div style="font-size:12px;color:var(--text2);margin-top:4px">'+eur(r.budget_indicativo)+'</div>':'')+'</div>'+
+  return '<div class="card rc" onclick="apriRichiesta(\''+r.id+'\')">'+
+    '<div class="rc-top">'+
+      '<div class="rc-main"><div class="rc-t">'+chi+'</div>'+
+      '<div class="rc-s">'+esc(r.numero||'')+(sub?' · '+sub:'')+'</div>'+
+      (r.oggetto?'<div class="rc-o">'+esc(r.oggetto)+'</div>':'')+'</div>'+
+      '<div class="rc-r">'+_riBadge(r.stato)+
+      (r.budget_indicativo?'<div class="rc-b">'+eur(r.budget_indicativo)+'</div>':'')+'</div>'+
     '</div>'+
-    (next?'<div style="margin-top:10px;text-align:right"><button class="bs" style="font-size:11px;padding:5px 10px" onclick="event.stopPropagation();avanzaStato(\''+r.id+'\',\''+next+'\')">→ '+_RI_STATI[next].label+'</button></div>':'')+
+    (next?'<div class="rc-act"><button class="bs sm" onclick="event.stopPropagation();avanzaStato(\''+r.id+'\',\''+next+'\')">→ '+_RI_STATI[next].label+'</button></div>':'')+
   '</div>';
 }
 function _riClientiOptions(){
@@ -2392,9 +2470,9 @@ function _vitaHTML(p,compatto){
     {on:v.fatt,  ico:'🧾', tit:'Fattura emessa'},
     {on:v.pagata,ico:'💰', tit:'Fattura pagata — lavoro chiuso'}
   ];
-  return '<span style="display:inline-flex;gap:3px;align-items:center">'+tappe.map((t,i)=>
-    `<span title="${esc(t.tit)}" style="font-size:${compatto?'10px':'12px'};line-height:1;padding:${compatto?'2px 5px':'3px 7px'};border-radius:9px;border:1px solid ${t.on?'var(--teal,#0E6B64)':'var(--brd,#E1E5EA)'};background:${t.on?'rgba(14,107,100,.15)':'transparent'};opacity:${t.on?'1':'.42'}">${t.ico}</span>`
-  ).join('<span style="color:var(--brd,#E1E5EA);font-size:9px">—</span>')+'</span>';
+  return '<span class="vt'+(compatto?' vt-c':'')+'">'+tappe.map(t=>
+    `<span class="vt-i${t.on?' on':''}" title="${esc(t.tit)}">${t.ico}</span>`
+  ).join('<span class="vt-s">—</span>')+'</span>';
 }
 // Stepper visivo "Vita del lavoro" per la scheda: Bozza → Inviato → Accettato → Cantiere → Fatturato → Saldato
 function _vitaStepper(p){
@@ -2541,37 +2619,37 @@ function _renderKpiLista(){
   const oggi=Date.now();
   const fermi=inv.filter(p=>{ const d=p.data?Date.parse(p.data):NaN; return isFinite(d)&&(oggi-d)>30*864e5; }).length;
   const sumInv=inv.reduce((s,p)=>s+val(p),0), sumAcc=acc.reduce((s,p)=>s+val(p),0);
-  const tile=(lb,vl,sb,warn)=>'<div style="flex:1;min-width:132px;background:var(--surface-2,#f7f8fa);border:1px solid '+(warn?'var(--gold,#9A5B00)':'var(--brd,#E1E5EA)')+';border-radius:10px;padding:10px 12px">'
-    +'<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text2,#556070)">'+lb+'</div>'
-    +'<div style="font-size:20px;font-weight:700'+(warn?';color:var(--gold,#9A5B00)':'')+'">'+vl+'</div>'
-    +'<div style="font-size:11px;color:var(--text2,#556070)">'+sb+'</div></div>';
-  box.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px';
-  box.innerHTML=tile('In trattativa',eur(sumInv),inv.length+' inviati')
+  const tile=(lb,vl,sb,warn)=>'<div class="kpi-t'+(warn?' warn':'')+'"><div class="kpi-l">'+lb+'</div><div class="kpi-v">'+vl+'</div><div class="kpi-s">'+sb+'</div></div>';
+  box.className='kpi-strip';
+  const tRic=tile('Da ricontattare',String(fermi),'inviati fermi da >30 gg',fermi>0);
+  box.innerHTML=(fermi>0?tRic:'')+tile('In trattativa',eur(sumInv),inv.length+' inviati')
     +tile('Accettati',eur(sumAcc),acc.length+' preventivi')
     +tile('Conversione',(conv==null?'—':conv+'%'),'accettati / decisi')
-    +tile('Da ricontattare',String(fermi),'inviati fermi da >30 gg',fermi>0);
+    +(fermi>0?'':tRic);
 }
 function _renderChipsLista(){
   const box=document.getElementById('lista-chips'); if(!box) return;
   const opts=[['','Tutti'],['bozza','Bozze'],['inviato','Inviati'],['accettato','Accettati'],['annullato','Annullati']];
-  box.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px';
+  box.className='chips-f';
   box.innerHTML=opts.map(o=>{ const v=o[0],l=o[1],on=(FILTRO_STATO===v);
-    return '<span onclick="filtraStato(\''+v+'\')" style="cursor:pointer;font-size:13px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid '+(on?'var(--text,#18222f)':'var(--line-strong,#cbd2da)')+';background:'+(on?'var(--text,#18222f)':'var(--surface,#fff)')+';color:'+(on?'var(--surface,#fff)':'var(--text2,#556070)')+'">'+l+'</span>';
+    return '<span class="chipf'+(on?' on':'')+'" role="button" onclick="filtraStato(\''+v+'\')">'+l+'</span>';
   }).join('');
 }
-function _revBadge(p){ const n=(p.revisioni&&p.revisioni.length)||parseInt(p.rev,10)||0; return n>0?'<span style="font-size:11px;font-weight:600;color:var(--gold,#9A5B00);background:var(--warn-soft,#fbefd9);border:1px solid var(--gold,#9A5B00);border-radius:999px;padding:2px 8px">📜 rev.'+n+'</span>':''; }
-function _ricontattaBadge(p){ if((p.stato||'')!=='inviato') return ''; const d=p.data?Date.parse(p.data):NaN; return (isFinite(d)&&(Date.now()-d)>30*864e5)?'<span style="font-size:11px;font-weight:700;color:var(--gold,#9A5B00);background:var(--warn-soft,#fbefd9);border:1px solid var(--gold,#9A5B00);border-radius:999px;padding:2px 8px">⚠ da ricontattare</span>':''; }
+function _revBadge(p){ const n=(p.revisioni&&p.revisioni.length)||parseInt(p.rev,10)||0; return n>0?'<span class="bx bo">📜 rev.'+n+'</span>':''; }
+function _ricontattaBadge(p){ if((p.stato||'')!=='inviato') return ''; const d=p.data?Date.parse(p.data):NaN; return (isFinite(d)&&(Date.now()-d)>30*864e5)?'<span class="bx bo">⚠ da ricontattare</span>':''; }
 function renderLista(){
   const q=(document.getElementById('cerca-prev').value||'').toLowerCase();
   const f=LISTA.filter(p=>_matchStato(p)&&(!q||((p.numero||'')+(p.cliente_nome||'')+(p.oggetto||'')).toLowerCase().includes(q)));
   _renderKpiLista(); _renderChipsLista();
   const _rg=typeof RAGGRUPPA!=='undefined'; if(_rg) RAGGRUPPA.registra('preventivi', renderLista);
   const _riga=p=>`
-    <div class="list-item" onclick="apriPreventivo(${p.id})">
-      <div style="min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px"><span class="li-num">${esc(p.numero)}</span>${_statoPrevBadge(p)}${_revBadge(p)}${_ricontattaBadge(p)}</div>
-      <div class="li-cli">${esc(p.cliente_nome||'—')}</div><div class="muted">${esc((p.oggetto||'').slice(0,90))}</div>
-      <div style="margin-top:6px">${_vitaHTML(p,true)}</div></div>
-      <div style="text-align:right;flex-shrink:0"><div class="li-imp">${eur(p.totale)}</div><div class="muted">${p.data?new Date(p.data).toLocaleDateString('it-IT'):''}</div></div>
+    <div class="list-item pv" onclick="apriPreventivo(${p.id})">
+      <div class="pv-top"><span class="li-num">${esc(p.numero)}</span>${_statoPrevBadge(p)}${_revBadge(p)}${_ricontattaBadge(p)}</div>
+      <div class="li-cli">${esc(p.cliente_nome||'—')}</div>
+      <div class="li-imp">${eur(p.totale)}</div>
+      <div class="muted pv-ogg">${esc((p.oggetto||'').slice(0,90))}</div>
+      <div class="pv-vita">${_vitaHTML(p,true)}</div>
+      <div class="muted pv-data">${p.data?new Date(p.data).toLocaleDateString('it-IT'):''}</div>
     </div>`;
   // Da seguire in cima (bozze e inviati), il resto per anno ▸ mese della data (raggruppa.js); la ricerca mostra tutto
   document.getElementById('lista-prev').innerHTML=f.length
@@ -2579,7 +2657,7 @@ function renderLista(){
              +RAGGRUPPA.tabella({ chiave:'preventivi', modo:'blocchi', voci:f, cerca:q, riga:_riga, data:p=>p.data,
                  somma:p=>parseFloat(p.totale)||0, formato:eur, daSeguire:p=>['bozza','inviato'].includes(p.stato||'bozza') })
            : f.map(_riga).join(''))
-    : '<div class="muted" style="padding:12px 0">Nessun preventivo trovato. Tocca «Nuovo preventivo» per crearne uno.</div>';
+    : '<div class="empty-s"><b>Nessun preventivo trovato.</b><br>Prova a togliere un filtro o a cambiare parola; oppure tocca «Nuovo preventivo» per crearne uno.</div>';
 }
 async function apriPreventivo(id){
   const p=LISTA.find(x=>x.id===id);if(!p)return;
@@ -3100,22 +3178,22 @@ function renderDocumenti(){
   const kpi=document.getElementById('doc-kpi');
   if(kpi) kpi.innerHTML=Object.keys(DOC_TIPI).map(k=>{
     const n=DOCS.filter(d=>d.tipo===k).length; const t=DOC_TIPI[k];
-    return '<div style="background:'+t.col+'22;border:1px solid '+t.col+'55;color:'+t.col+';padding:6px 12px;border-radius:10px;font-size:12px;font-weight:700">'+t.icona+' '+n+' '+esc(t.label)+'</div>';
+    return '<div class="kpi-c">'+t.icona+' <b>'+n+'</b> '+esc(t.label)+'</div>';
   }).join('');
   const lista=DOCS.filter(d=>{
     if(f && d.tipo!==f) return false;
     if(!q) return true;
     return ((d.numero||'')+' '+(d.destinatario_nome||'')+' '+(d.oggetto||'')+' '+(d.luogo||'')).toLowerCase().includes(q);
   });
-  if(!lista.length){ box.innerHTML='<div class="muted" style="padding:18px;text-align:center">Nessun documento in archivio.</div>'; return; }
+  if(!lista.length){ box.innerHTML='<div class="empty-s"><b>Nessun documento trovato.</b><br>Cambia ricerca o filtro, oppure crea un nuovo documento.</div>'; return; }
   const _rg=typeof RAGGRUPPA!=='undefined'; if(_rg) RAGGRUPPA.registra('documenti', renderDocumenti);
   const _riga=d=>{
     const t=DOC_TIPI[d.tipo]||DOC_TIPI.lettera;
-    return '<div onclick="apriDocumento(\''+d.id+'\')" style="cursor:pointer;border:1px solid var(--brd);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
-      '<span style="background:'+t.col+'22;color:'+t.col+';padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap">'+t.icona+' '+esc(t.label)+'</span>'+
-      '<b style="white-space:nowrap">'+esc(d.numero||'—')+'</b>'+
-      '<span style="flex:1;min-width:120px">'+esc(d.destinatario_nome||d.luogo||'—')+'<br><span class="muted" style="font-size:12px">'+esc((d.oggetto||'').slice(0,90))+'</span></span>'+
-      '<span class="muted" style="font-size:12px;white-space:nowrap">'+_dataIt(d.data)+'</span></div>';
+    return '<div class="rowc" onclick="apriDocumento(\''+d.id+'\')">'+
+      '<span class="bx bz">'+t.icona+' '+esc(t.label)+'</span>'+
+      '<b class="rowc-n">'+esc(d.numero||'—')+'</b>'+
+      '<span class="rowc-m"><span class="rowc-s">'+esc(d.destinatario_nome||d.luogo||'—')+'</span><br><span class="muted">'+esc((d.oggetto||'').slice(0,90))+'</span></span>'+
+      '<span class="muted rowc-d">'+_dataIt(d.data)+'</span></div>';
   };
   // per anno ▸ mese della data del documento (raggruppa.js); la ricerca mostra tutto
   box.innerHTML = _rg ? '<div style="margin-bottom:10px">'+RAGGRUPPA.selettoreAnno('documenti',DOCS,d=>d.data)+'</div>'
@@ -3449,23 +3527,24 @@ function renderConsuntivi(){
   const f=document.getElementById('cons-filtro').value||'';
   if(kpi){
     const tot=CONS.reduce((s,c)=>s+(parseFloat(c.totale)||0),0);
-    kpi.innerHTML='<div style="background:var(--card,#FFFFFF);border:1px solid var(--brd,#E1E5EA);border-radius:10px;padding:8px 12px;font-size:12px">Consuntivi: <b>'+CONS.length+'</b></div>'+
-      '<div style="background:var(--card,#FFFFFF);border:1px solid var(--brd,#E1E5EA);border-radius:10px;padding:8px 12px;font-size:12px">Totale: <b>'+eur(tot)+'</b></div>';
+    kpi.innerHTML='<div class="kpi-c">Consuntivi: <b>'+CONS.length+'</b></div>'+
+      '<div class="kpi-c">Totale: <b>'+eur(tot)+'</b></div>';
   }
   let lista=CONS.slice();
   if(f) lista=lista.filter(c=>(c.stato||'bozza')===f);
   if(q) lista=lista.filter(c=>((c.numero||'')+' '+(c.cliente_nome||'')+' '+(c.oggetto||'')+' '+(c.cantiere_nome||'')+' '+(c.preventivo_numero||'')).toLowerCase().includes(q));
-  if(!lista.length){ box.innerHTML='<div class="muted" style="padding:18px;text-align:center">Nessun consuntivo in archivio.</div>'; return; }
+  if(!lista.length){ box.innerHTML='<div class="empty-s"><b>Nessun consuntivo trovato.</b><br>Cambia ricerca o filtro, oppure crea un nuovo consuntivo.</div>'; return; }
   const _rg=typeof RAGGRUPPA!=='undefined'; if(_rg) RAGGRUPPA.registra('consuntivi', renderConsuntivi);
   const _riga=c=>{
     const dt=c.data?new Date(c.data).toLocaleDateString('it-IT'):'';
     const link=[c.preventivo_numero?('← '+esc(c.preventivo_numero)):'',c.cantiere_nome?('🏗 '+esc(c.cantiere_nome)):''].filter(Boolean).join(' · ');
-    return '<div onclick="apriConsuntivo(\''+c.id+'\')" style="cursor:pointer;border:1px solid var(--brd);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
-      '<div style="flex:1;min-width:160px"><b>'+esc(c.numero||'(senza numero)')+'</b> <span class="muted" style="font-size:11px">'+esc(dt)+'</span>'+
-        '<div style="font-size:12px;color:var(--text2,#556070)">'+esc(c.cliente_nome||'')+(c.oggetto?' — '+esc(c.oggetto):'')+'</div>'+
-        (link?'<div style="font-size:10.5px;color:var(--gold,#9A5B00);margin-top:2px">'+link+'</div>':'')+
+    const _stc={bozza:'bz',definitivo:'bo',inviato:'bi',fatturato:'bg',annullato:'br'}; const _st=c.stato||'bozza';
+    return '<div class="rowc" onclick="apriConsuntivo(\''+c.id+'\')">'+
+      '<div class="rowc-m"><div class="rowc-h"><b>'+esc(c.numero||'(senza numero)')+'</b> <span class="muted">'+esc(dt)+'</span><span class="bx st '+(_stc[_st]||'bz')+'">'+esc(_st.charAt(0).toUpperCase()+_st.slice(1))+'</span></div>'+
+        '<div class="rowc-s">'+esc(c.cliente_nome||'')+(c.oggetto?' — '+esc(c.oggetto):'')+'</div>'+
+        (link?'<div class="rowc-l">'+link+'</div>':'')+
       '</div>'+
-      '<div class="mn" style="font-weight:700">'+eur(c.totale)+'</div>'+
+      '<div class="mn rowc-i">'+eur(c.totale)+'</div>'+
     '</div>';
   };
   // Da seguire in cima (bozza, definitivo, inviato: non ancora fatturati), il resto per anno ▸ mese (raggruppa.js)
@@ -3663,23 +3742,23 @@ function renderModifiche(){
   const q=(document.getElementById('mod-cerca').value||'').toLowerCase();
   const f=document.getElementById('mod-filtro').value||'';
   const ic={preventivo:'📄',consuntivo:'📊',documento:'🗂'};
-  const colAz={creato:'#276B43',modificato:'#9A5B00',eliminato:'#B42318'};
+  const colAz={creato:'bg',modificato:'bo',eliminato:'br'};
   let lista=MODS.slice();
   if(f) lista=lista.filter(m=>m.entita===f);
   if(q) lista=lista.filter(m=>((m.numero||'')+' '+(m.sintesi||'')+' '+(m.entita||'')+' '+(m.azione||'')+' '+(m.utente||'')).toLowerCase().includes(q));
-  if(!lista.length){ box.innerHTML='<div class="muted" style="padding:18px;text-align:center">Nessuna modifica registrata.</div>'; return; }
+  if(!lista.length){ box.innerHTML='<div class="empty-s"><b>Nessuna modifica trovata.</b><br>Cambia ricerca o filtro.</div>'; return; }
   box.innerHTML=lista.map(m=>{
     const dt=m.creato_il?new Date(m.creato_il).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-    const col=colAz[m.azione]||'var(--text2,#556070)';
-    return '<div style="border:1px solid var(--brd);border-radius:10px;padding:9px 12px;margin-bottom:7px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
-      '<span style="font-size:16px">'+(ic[m.entita]||'•')+'</span>'+
-      '<div style="flex:1;min-width:160px">'+
-        '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b style="font-size:13px">'+esc(m.numero||'—')+'</b>'+
-          '<span style="font-size:10px;font-weight:700;color:'+col+'">'+esc((m.azione||'').toUpperCase())+'</span>'+
-          '<span style="font-size:10px;color:var(--text2,#556070)">'+esc(m.entita||'')+'</span></div>'+
-        (m.sintesi?'<div style="font-size:12px;color:var(--text2,#556070)">'+esc(m.sintesi)+'</div>':'')+
+    const col=colAz[m.azione]||'bz';
+    return '<div class="rowc mod">'+
+      '<span style="font-size:18px">'+(ic[m.entita]||'•')+'</span>'+
+      '<div class="rowc-m">'+
+        '<div class="rowc-h"><b>'+esc(m.numero||'—')+'</b>'+
+          '<span class="bx '+col+'">'+esc((m.azione||'').toUpperCase())+'</span>'+
+          '<span class="muted">'+esc(m.entita||'')+'</span></div>'+
+        (m.sintesi?'<div class="rowc-s muted">'+esc(m.sintesi)+'</div>':'')+
       '</div>'+
-      '<div style="text-align:right;font-size:10.5px;color:var(--text2,#556070)">'+esc(dt)+(m.utente?'<br>'+esc(m.utente):'')+'</div>'+
+      '<div class="rowc-i">'+esc(dt)+(m.utente?'<br>'+esc(m.utente):'')+'</div>'+
     '</div>';
   }).join('');
 }
