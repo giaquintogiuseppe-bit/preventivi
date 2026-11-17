@@ -2441,7 +2441,7 @@ async function caricaLista(){
     const [rp,cv,rf]=await Promise.all([
       fetch(SB_URL+'/rest/v1/preventivi?select=*&order=creato_il.desc',{headers:SB_H,cache:'no-cache'}),
       _commesseDaTabella().catch(()=>[]),
-      fetch(SB_URL+'/rest/v1/fatture?select=cantiere_id,cantiere_nome,stato,numero',{headers:SB_H,cache:'no-cache'})
+      fetch(SB_URL+'/rest/v1/fatture?select=cantiere_id,cantiere_nome,stato,numero,importo',{headers:SB_H,cache:'no-cache'})
     ]);
     LISTA=await rp.json();
     CANT_V=Array.isArray(cv)?cv:[];
