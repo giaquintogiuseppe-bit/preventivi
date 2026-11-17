@@ -2498,9 +2498,20 @@ function _vitaPrev(p){
   // Solo le fatture realmente emesse accendono la tappa: 'da_emettere' e 'annullata' non contano.
   const emesse = mie.filter(f=>f.stato==='emessa'||f.stato==='pagata');
   const daEmettere = mie.filter(f=>f.stato==='da_emettere');
-  const fatt = emesse.length>0;
-  const pagata = emesse.length>0 && emesse.every(f=>f.stato==='pagata');
-  return {acc, cant:!!cant, chiuso, fatt, pagata, daEmettere:daEmettere.length, cantNome:cant?cant.nome:null, manuale:!!p.cantiere_id, _cant:cant, _emesse:emesse, _daEmettere:daEmettere};
+  // "Fatturato" = almeno una fattura emessa. "Saldato" = TUTTO fatturato E tutto pagato:
+  // finché l'importo fatturato non copre il totale del preventivo NON è saldato, anche se
+  // le (poche) fatture emesse risultano pagate — es. solo un acconto. (bug "tutto saldato")
+  const fatturatoLordo = emesse.reduce((s,f)=>s+(+f.importo||0),0);
+  const attesoLordo = (+p.totale||0) || ((+p.imponibile||0)*(1+(+p.iva_perc||0)/100));
+  const pienFatt = attesoLordo>0 ? (fatturatoLordo >= attesoLordo-0.5) : (emesse.length>0);
+  const restaDaFatt = attesoLordo>0 ? Math.max(0, attesoLordo-fatturatoLordo) : 0;
+  let fatt = emesse.length>0;
+  let pagata = fatt && pienFatt && emesse.every(f=>f.stato==='pagata');
+  // Avanzamento forzato a mano, indipendente dalle fatture: null | 'fatturato' | 'pagato'
+  const man = (p.avanzamento_manuale==='fatturato'||p.avanzamento_manuale==='pagato') ? p.avanzamento_manuale : null;
+  if(man==='fatturato'){ fatt=true; pagata=false; }
+  else if(man==='pagato'){ fatt=true; pagata=true; }
+  return {acc, cant:!!cant, chiuso, fatt, pagata, daEmettere:daEmettere.length, cantNome:cant?cant.nome:null, manuale:!!p.cantiere_id, avanzamentoManuale:man, pienFatt, restaDaFatt, fatturatoLordo, attesoLordo, _cant:cant, _emesse:emesse, _daEmettere:daEmettere};
 }
 // Stato del preventivo scritto in chiaro, con il codice colori del design system v2
 // (stessa logica della frase nel box "Vita del lavoro").
@@ -2559,7 +2570,16 @@ function renderVitaBox(){
   const vb=document.getElementById('vita-box'); const p=window._pAperto;
   if(!vb||!p) return;
   const v=_vitaPrev(p);
-  const frase = v.pagata?'💰 Tutto saldato — lavoro chiuso':v.fatt?'Fattura emessa — attesa pagamento':v.daEmettere?'Fattura preparata ma NON ancora emessa':v.chiuso?'Cantiere chiuso — da fatturare':v.cant?'Cantiere aperto'+(v.cantNome?': '+esc(v.cantNome):''):v.acc?'Accettato — cantiere da aprire':'In trattativa';
+  const man=v.avanzamentoManuale;
+  const _amano = man?' <span style="opacity:.65;font-size:.85em">(a mano)</span>':'';
+  const frase = v.pagata?('💰 Tutto saldato — lavoro chiuso'+_amano)
+    :(v.fatt&&man==='fatturato')?('🧾 Fatturato — attesa pagamento'+_amano)
+    :(v.fatt&&!v.pienFatt)?('🧾 Fatturato in parte — resta da fatturare '+eur(v.restaDaFatt)+' (IVA incl.)')
+    :v.fatt?'🧾 Fattura emessa — attesa pagamento'
+    :v.daEmettere?'Fattura preparata ma NON ancora emessa'
+    :v.chiuso?'Cantiere chiuso — da fatturare'
+    :v.cant?('Cantiere aperto'+(v.cantNome?': '+esc(v.cantNome):''))
+    :v.acc?'Accettato — cantiere da aprire':'In trattativa';
   const stati=['bozza','inviato','accettato','annullato'];
   if(p.stato&&!stati.includes(p.stato)) stati.push(p.stato); // es. "convertito" legacy
   vb.style.display='flex'; vb.style.flexWrap='wrap';
@@ -2569,6 +2589,8 @@ function renderVitaBox(){
     +'<div class="vb-az">'
       +'<label class="vb-sel"><span>Stato</span><select onchange="cambiaStato(this.value)">'
       +stati.map(s=>`<option value="${s}"${s===(p.stato||'bozza')?' selected':''}>${s}</option>`).join('')+'</select></label>'
+      +'<label class="vb-sel"><span>Avanzamento</span><select onchange="cambiaAvanzamento(this.value)">'
+      +[['auto','Automatico'],['fatturato','Fatturato (a mano)'],['pagato','Pagato (a mano)']].map(o=>`<option value="${o[0]}"${(man||'auto')===o[0]?' selected':''}>${o[1]}</option>`).join('')+'</select></label>'
       +'<span class="vb-lk" role="button" onclick="apriCollega()">🔗 '+(v.manuale?'cantiere collegato a mano':'collega cantiere')+'</span>'
       +_vitaAzioniCommessa(p,v)
     +'</div>';
@@ -2588,6 +2610,24 @@ function _vitaAzioniCommessa(p,v){
     h+='<span class="vb-lk" role="button" onclick="apriStoricoRevisioni()" title="Storico delle revisioni sincronizzate con il Gestionale">📜 rev.'+nRev+'</span>';
   }
   return h;
+}
+// Avanzamento "a mano" (fatturato/pagato) indipendente dalle fatture collegate.
+// Resta SEPARATO da `stato` (bozza/inviato/accettato/annullato), che il Gestionale
+// legge per calcolare il ricavo della commessa: qui si scrive solo `avanzamento_manuale`.
+async function cambiaAvanzamento(val){
+  const p=window._pAperto; if(!p||!_editId) return;
+  const nuovo=(val==='fatturato'||val==='pagato')?val:null;
+  try{
+    const r=await fetch(SB_URL+'/rest/v1/preventivi?id=eq.'+_editId,{method:'PATCH',headers:{...SB_H,Prefer:'return=representation'},body:JSON.stringify({avanzamento_manuale:nuovo,aggiornato_il:new Date().toISOString()})});
+    if(!r.ok){ let m='HTTP '+r.status; try{ const j=await r.json(); m=(j&&(j.message||j.hint||j.details))||m; }catch(e){} throw new Error(m); }
+    const rows=await r.json().catch(()=>[]);
+    if(!Array.isArray(rows)||!rows.length) throw new Error('nessuna riga aggiornata (sessione scaduta? esci e rientra)');
+    p.avanzamento_manuale=nuovo;
+    _logMod('preventivo',_editId,p.numero,'modificato',nuovo?('avanzamento a mano: '+nuovo):'avanzamento: automatico',null);
+    toast(nuovo?('✓ Avanzamento segnato a mano: '+nuovo):'✓ Avanzamento tornato automatico');
+    renderVitaBox();
+    try{ if(typeof renderLista==='function') renderLista(); }catch(e){}
+  }catch(e){ const m=String((e&&e.message)||e); toast('⚠ Non aggiornato: '+m.slice(0,90)); console.error('cambiaAvanzamento',e); }
 }
 async function cambiaStato(nuovo){
   const p=window._pAperto; if(!p||!_editId) return;
